@@ -54,19 +54,23 @@ async function handleInteraction(interaction) {
     }
 
     if (interaction.isStringSelectMenu()) {
-      return handleSelectMenu(interaction);
+      await handleSelectMenu(interaction);
+      return;
     }
 
     if (interaction.isChannelSelectMenu()) {
-      return handleChannelSelectMenu(interaction);
+      await handleChannelSelectMenu(interaction);
+      return;
     }
 
     if (interaction.isButton()) {
-      return handleButton(interaction);
+      await handleButton(interaction);
+      return;
     }
 
     if (interaction.isModalSubmit()) {
-      return handleModalSubmit(interaction);
+      await handleModalSubmit(interaction);
+      return;
     }
   } catch (err) {
     console.error('Erro ao processar interacao:', err);
@@ -596,7 +600,7 @@ async function abrirModalHorarios(interaction, store) {
 
   const horariosInput = new TextInputBuilder()
     .setCustomId('horarios')
-    .setLabel('Horários (formato HH:MM, separados por vírgula)')
+    .setLabel('Horários (HH:MM, separados por vírgula)')
     .setPlaceholder('09:00, 18:00')
     .setStyle(TextInputStyle.Short)
     .setValue((store.sales.sendTimes || []).join(', '))

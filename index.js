@@ -35,6 +35,11 @@ client.on('interactionCreate', (interaction) => {
   handleInteraction(interaction);
 });
 
+// Evita que erros inesperados derrubem o bot inteiro
+process.on('unhandledRejection', (err) => {
+  console.error('⚠️ Erro não tratado (bot continua online):', err?.message || err);
+});
+
 client.login(process.env.DISCORD_TOKEN).catch(err => {
   console.error('❌ Falha ao conectar no Discord:', err.message);
   process.exit(1);
