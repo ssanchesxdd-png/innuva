@@ -1,0 +1,14 @@
+{
+  "name": "innova-forn-bot",
+  "version": "2.0.0",
+  "description": "Bot de vendas Innova Forn - tickets, saldo, cupons, pagamentos pendentes e recibos",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.5",
+    "node-cron": "^3.0.3"
+  }
+}
