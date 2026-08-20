@@ -114,7 +114,7 @@ async function mostrarMenuRoot(interaction) {
       `- **Configuração de tickets:** setar o canal de suporte.\n` +
       `- **Configuração de logs:** setar os canais de log públicos e privados.\n` +
       `- **Personalização:** personalize o nome do bot, da loja e escolha a cor.`,
-    sections: [{ label: 'Selecione uma categoria', accessory: menu }]
+    rows: [new ActionRowBuilder().addComponents(menu)]
   });
 
   await updateV2(interaction, container);
@@ -141,10 +141,8 @@ async function mostrarMenuVendas(interaction) {
   const container = v2Container(store, {
     title: '💰 Configurações de Vendas',
     description: 'Escolha o que deseja configurar.',
-    sections: [
-      { label: 'O que deseja configurar?', accessory: menu },
-      secaoVoltar('root')
-    ]
+    rows: [new ActionRowBuilder().addComponents(menu)],
+    sections: [secaoVoltar('root')]
   });
 
   await updateV2(interaction, container);
@@ -252,10 +250,8 @@ async function mostrarMenuTicket(interaction) {
   const container = v2Container(store, {
     title: '🎫 Configuração de Ticket',
     description: 'Selecione em qual canal o painel de "Abrir Ticket" será publicado.',
-    sections: [
-      { label: 'Canal do painel de suporte', accessory: channelMenu },
-      secaoVoltar('root')
-    ]
+    rows: [new ActionRowBuilder().addComponents(channelMenu)],
+    sections: [secaoVoltar('root')]
   });
 
   await updateV2(interaction, container);
@@ -274,10 +270,8 @@ async function mostrarMenuLogs(interaction) {
   const container = v2Container(store, {
     title: '📋 Configuração de Logs',
     description: 'Escolha qual tipo de log deseja configurar.',
-    sections: [
-      { label: 'Qual log deseja configurar?', accessory: menu },
-      secaoVoltar('root')
-    ]
+    rows: [new ActionRowBuilder().addComponents(menu)],
+    sections: [secaoVoltar('root')]
   });
 
   await updateV2(interaction, container);
@@ -374,10 +368,8 @@ async function mostrarSelecaoCanalLog(interaction, tipo) {
   const container = v2Container(store, {
     title: `📋 Log ${tipo}`,
     description: `Selecione o canal de texto para o log ${tipo}.`,
-    sections: [
-      { label: `Canal de log ${tipo}`, accessory: channelMenu },
-      secaoVoltar('logs')
-    ]
+    rows: [new ActionRowBuilder().addComponents(channelMenu)],
+    sections: [secaoVoltar('logs')]
   });
 
   await updateV2(interaction, container);
@@ -394,10 +386,8 @@ async function mostrarSelecaoCanaisEnvio(interaction, store) {
   const container = v2Container(store, {
     title: '📢 Canais de Envio das Embeds',
     description: 'Selecione em quais canais os cards de produto serão publicados e reenviados diariamente.',
-    sections: [
-      { label: 'Canais de envio', accessory: channelMenu },
-      secaoVoltar('vendas')
-    ]
+    rows: [new ActionRowBuilder().addComponents(channelMenu)],
+    sections: [secaoVoltar('vendas')]
   });
 
   await updateV2(interaction, container);
@@ -432,10 +422,8 @@ async function mostrarSelecaoProduto(interaction, store, finalidade) {
   const container = v2Container(store, {
     title: '📦 Selecione o produto',
     description: 'Escolha o produto na lista abaixo:',
-    sections: [
-      { label: 'Produto', accessory: menu },
-      secaoVoltar('vendas')
-    ]
+    rows: [new ActionRowBuilder().addComponents(menu)],
+    sections: [secaoVoltar('vendas')]
   });
 
   await updateV2(interaction, container);

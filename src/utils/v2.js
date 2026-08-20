@@ -1,10 +1,9 @@
 // src/utils/v2.js
 // Helpers de Components V2 (Container + TextDisplay + Separator + Section).
 //
-// NOTA: o discord.js 14.27 ainda so valida Button/Thumbnail como acessorio de
-// Section, mas a API oficial do Discord aceita select menus (String/User/Role/
-// Mentionable/Channel), TextInput e MediaGallery. Aplicamos um patch localizado
-// no toJSON do SectionBuilder apenas para liberar isso.
+// NOTA: a API do Discord so aceita Button (type 2) e Thumbnail (type 11) como
+// acessorio de Section (type 9). Menus dropdown devem ir em ActionRow dentro
+// do container, e nao como acessorio de section.
 
 const {
   ContainerBuilder,
@@ -15,15 +14,6 @@ const {
 } = require('discord.js');
 
 const V2_FLAGS = [MessageFlags.IsComponentsV2];
-
-// Patch: serializa a Section sem o predicate que limita o accessory.
-SectionBuilder.prototype.toJSON = function () {
-  return {
-    ...this.data,
-    components: this.components.map((c) => c.toJSON()),
-    accessory: this.accessory ? this.accessory.toJSON() : undefined
-  };
-};
 
 // Cria uma Section (type 9): texto à esquerda + acessório (select/botão) à direita.
 function v2Section(label, accessory) {

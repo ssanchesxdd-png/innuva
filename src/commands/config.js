@@ -6,6 +6,7 @@
 const {
   SlashCommandBuilder,
   StringSelectMenuBuilder,
+  ActionRowBuilder,
   MessageFlags,
   PermissionFlagsBits
 } = require('discord.js');
@@ -38,7 +39,7 @@ module.exports = {
         `- **Configuração de tickets:** setar o canal de suporte.\n` +
         `- **Configuração de logs:** setar os canais de log públicos e privados.\n` +
         `- **Personalização:** personalize o nome do bot, da loja e escolha a cor.`,
-      sections: [{ label: 'Selecione uma categoria', accessory: menu }]
+      rows: [new ActionRowBuilder().addComponents(menu)]
     });
 
     await interaction.reply({
