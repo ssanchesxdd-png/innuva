@@ -7,7 +7,8 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  EmbedBuilder
+  EmbedBuilder,
+  MessageFlags
 } = require('discord.js');
 const { loadStore, saveStore, generatePurchaseId } = require('../storage');
 const { publicSaleEmbed, referenciaEmbed, pendingCardEmbed, privateLogEmbed } = require('../utils/embeds');
@@ -212,7 +213,7 @@ async function finalizarCompra(interaction, store, compra) {
     }
   }
 
-  await interaction.reply({ content: `✅ Pagamento aprovado! Compra **${compra.id}** finalizada.`, ephemeral: true });
+  await interaction.reply({ content: `✅ Pagamento aprovado! Compra **${compra.id}** finalizada.`, flags: MessageFlags.Ephemeral });
 
   // Arquiva a thread
   if (interaction.channel?.isThread()) {
@@ -253,19 +254,19 @@ async function handleReferencia(interaction, compraId) {
   const compra = store.sales.history.find(c => c.id === compraId);
 
   if (!compra) {
-    return interaction.reply({ content: '❌ Compra não encontrada.', ephemeral: true });
+    return interaction.reply({ content: '❌ Compra não encontrada.', flags: MessageFlags.Ephemeral });
   }
 
   const embed = referenciaEmbed(store, compra);
 
   if (compra.referenceImage) {
-    return interaction.reply({ embeds: [embed], ephemeral: true });
+    return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
   }
 
   return interaction.reply({
     content: '📄 Esta compra não possui foto de referência.',
     embeds: [embed],
-    ephemeral: true
+    flags: MessageFlags.Ephemeral
   });
 }
 

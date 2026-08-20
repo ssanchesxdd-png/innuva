@@ -6,7 +6,8 @@ const {
   PermissionFlagsBits,
   EmbedBuilder,
   ActionRowBuilder,
-  StringSelectMenuBuilder
+  StringSelectMenuBuilder,
+  MessageFlags
 } = require('discord.js');
 const { loadStore, saveStore, generateId } = require('../storage');
 const { couponListEmbed } = require('../utils/embeds');
@@ -64,7 +65,7 @@ module.exports = {
     if (!isStaff(interaction.member)) {
       return interaction.reply({
         content: '❌ Você não tem permissão para usar este comando.',
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
     }
 
@@ -81,7 +82,7 @@ module.exports = {
       });
 
       if (!resultado.ok) {
-        return interaction.reply({ content: `❌ ${resultado.error}`, ephemeral: true });
+        return interaction.reply({ content: `❌ ${resultado.error}`, flags: MessageFlags.Ephemeral });
       }
 
       saveStore(interaction.guildId, store);
@@ -105,7 +106,7 @@ module.exports = {
 
     if (sub === 'listar') {
       const embed = couponListEmbed(store);
-      return interaction.reply({ embeds: [embed], ephemeral: true });
+      return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     }
 
     if (sub === 'deletar') {
@@ -113,11 +114,11 @@ module.exports = {
       const resultado = deletarCupom(store, code);
 
       if (!resultado) {
-        return interaction.reply({ content: `❌ Cupom \`${code}\` não encontrado.`, ephemeral: true });
+        return interaction.reply({ content: `❌ Cupom \`${code}\` não encontrado.`, flags: MessageFlags.Ephemeral });
       }
 
       saveStore(interaction.guildId, store);
-      return interaction.reply({ content: `🗑️ Cupom \`${code}\` deletado com sucesso.`, ephemeral: true });
+      return interaction.reply({ content: `🗑️ Cupom \`${code}\` deletado com sucesso.`, flags: MessageFlags.Ephemeral });
     }
   }
 };

@@ -10,7 +10,8 @@ const {
   EmbedBuilder,
   ModalBuilder,
   TextInputBuilder,
-  TextInputStyle
+  TextInputStyle,
+  MessageFlags
 } = require('discord.js');
 const { loadStore, saveStore, generateId, getBalance, addBalance } = require('../storage');
 const { privateLogEmbed, ticketPanelEmbed } = require('../utils/embeds');
@@ -29,7 +30,7 @@ async function abrirTicket(interaction, store, produtoNomeSugerido) {
   if (!panelChannel) {
     return interaction.reply({
       content: 'O canal de tickets configurado nao foi encontrado. Avise a staff.',
-      ephemeral: true
+      flags: MessageFlags.Ephemeral
     });
   }
 
@@ -84,7 +85,7 @@ async function abrirTicket(interaction, store, produtoNomeSugerido) {
     }
   }
 
-  await interaction.reply({ content: `Ticket criado: ${thread}`, ephemeral: true });
+  await interaction.reply({ content: `Ticket criado: ${thread}`, flags: MessageFlags.Ephemeral });
 }
 
 // Usado tanto pelo botao "Confirmar Venda" quanto pelo comando /vendida.
@@ -92,7 +93,7 @@ async function confirmarVenda(interaction) {
   if (!interaction.channel.isThread()) {
     return interaction.reply({
       content: 'Este comando/botão só pode ser usado dentro de um ticket (thread).',
-      ephemeral: true
+      flags: MessageFlags.Ephemeral
     });
   }
 
@@ -162,18 +163,18 @@ async function processarConfirmacaoVenda(interaction) {
   if (!produto) {
     return interaction.reply({
       content: `Produto "${produtoNome}" não encontrado no catálogo. Confira o nome exato em /config > Vendas > Listar Produtos.`,
-      ephemeral: true
+      flags: MessageFlags.Ephemeral
     });
   }
 
   if (quantidade <= 0) {
-    return interaction.reply({ content: '❌ Quantidade inválida.', ephemeral: true });
+    return interaction.reply({ content: '❌ Quantidade inválida.', flags: MessageFlags.Ephemeral });
   }
 
   if (produto.stock < quantidade) {
     return interaction.reply({
       content: `❌ Estoque insuficiente. Restam ${produto.stock} unidade(s) de ${produto.name}.`,
-      ephemeral: true
+      flags: MessageFlags.Ephemeral
     });
   }
 
@@ -182,7 +183,7 @@ async function processarConfirmacaoVenda(interaction) {
   if (cupomCode) {
     const resultado = aplicarCupom(store, cupomCode);
     if (!resultado.ok) {
-      return interaction.reply({ content: `❌ Cupom: ${resultado.error}`, ephemeral: true });
+      return interaction.reply({ content: `❌ Cupom: ${resultado.error}`, flags: MessageFlags.Ephemeral });
     }
     discount = calcularDesconto(resultado.cupom, produto.price * quantidade);
     discount = Math.round(discount * 100) / 100;
@@ -263,12 +264,12 @@ async function pagarComSaldo(interaction, sessaoId) {
   const sessao = sessaoVendaMap.get(sessaoId);
 
   if (!sessao) {
-    return interaction.reply({ content: '❌ Sessão de venda expirada. Inicie novamente com "Confirmar Venda".', ephemeral: true });
+    return interaction.reply({ content: '❌ Sessão de venda expirada. Inicie novamente com "Confirmar Venda".', flags: MessageFlags.Ephemeral });
   }
 
   const saldo = getBalance(store, interaction.user.id);
   if (saldo <= 0) {
-    return interaction.reply({ content: '❌ Você não possui saldo.', ephemeral: true });
+    return interaction.reply({ content: '❌ Você não possui saldo.', flags: MessageFlags.Ephemeral });
   }
 
   const usarSaldo = Math.min(saldo, sessao.finalValue);
@@ -326,7 +327,7 @@ async function pagarComPix(interaction, sessaoId) {
   const sessao = sessaoVendaMap.get(sessaoId);
 
   if (!sessao) {
-    return interaction.reply({ content: '❌ Sessão de venda expirada. Inicie novamente com "Confirmar Venda".', ephemeral: true });
+    return interaction.reply({ content: '❌ Sessão de venda expirada. Inicie novamente com "Confirmar Venda".', flags: MessageFlags.Ephemeral });
   }
 
   sessaoVendaMap.delete(sessaoId);
@@ -345,7 +346,7 @@ async function cancelarSessao(interaction, sessaoId) {
 
 async function fecharTicket(interaction) {
   if (!interaction.channel.isThread()) {
-    return interaction.reply({ content: 'Isso só funciona dentro de um ticket.', ephemeral: true });
+    return interaction.reply({ content: 'Isso só funciona dentro de um ticket.', flags: MessageFlags.Ephemeral });
   }
   await interaction.reply({ content: 'Fechando ticket em 5 segundos...' });
   setTimeout(() => {

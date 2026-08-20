@@ -1,7 +1,7 @@
 // src/commands/comprar.js
 // Comando /comprar: abre uma thread privada (ticket) para negociar a compra de um produto.
 
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { loadStore } = require('../storage');
 const { abrirTicket } = require('../handlers/tickets');
 
@@ -21,7 +21,7 @@ module.exports = {
     if (!store.ticket.panelChannelId) {
       return interaction.reply({
         content: 'O sistema de tickets ainda não foi configurado. Peça para a staff usar `/config`.',
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
     }
 

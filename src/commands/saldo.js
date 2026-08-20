@@ -4,7 +4,8 @@
 const {
   SlashCommandBuilder,
   PermissionFlagsBits,
-  EmbedBuilder
+  EmbedBuilder,
+  MessageFlags
 } = require('discord.js');
 const { loadStore, saveStore, getBalance, addBalance } = require('../storage');
 
@@ -66,19 +67,19 @@ module.exports = {
     if (!isStaff(interaction.member)) {
       return interaction.reply({
         content: '❌ Você não tem permissão para isso. Apenas a staff pode adicionar/remover saldo.',
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
     }
 
     if (!membro || !valor || !acao) {
       return interaction.reply({
         content: '❌ Para adicionar/remover saldo, informe o **membro**, o **valor** e a **ação**. Ex: `/saldo membro:@user valor:50 acao:Adicionar`',
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
     }
 
     if (valor <= 0) {
-      return interaction.reply({ content: '❌ O valor deve ser maior que zero.', ephemeral: true });
+      return interaction.reply({ content: '❌ O valor deve ser maior que zero.', flags: MessageFlags.Ephemeral });
     }
 
     const antes = getBalance(store, membro.id);

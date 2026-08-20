@@ -1,7 +1,7 @@
 // src/commands/estoque.js
 // Comando /estoque: mostra as contas disponiveis, publico para qualquer pessoa.
 
-const { SlashCommandBuilder, StringSelectMenuBuilder, ActionRowBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, StringSelectMenuBuilder, ActionRowBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const { loadStore } = require('../storage');
 
 module.exports = {
@@ -16,7 +16,7 @@ module.exports = {
     if (jogos.length === 0) {
       return interaction.reply({
         content: 'Ainda não há produtos cadastrados. Peça para a staff configurar com `/config`.',
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
     }
 

@@ -14,7 +14,8 @@ const {
   TextInputBuilder,
   TextInputStyle,
   ButtonBuilder,
-  ButtonStyle
+  ButtonStyle,
+  MessageFlags
 } = require('discord.js');
 
 const { loadStore, saveStore, generateId } = require('../storage');
@@ -75,7 +76,7 @@ async function handleInteraction(interaction) {
     }
   } catch (err) {
     console.error('Erro ao processar interacao:', err);
-    const payload = { content: 'Ocorreu um erro ao processar isso. Tente novamente.', ephemeral: true };
+    const payload = { content: 'Ocorreu um erro ao processar isso. Tente novamente.', flags: MessageFlags.Ephemeral };
     if (interaction.replied || interaction.deferred) {
       await interaction.followUp(payload).catch(() => {});
     } else {
@@ -922,14 +923,14 @@ async function handleModalSubmit(interaction) {
       console.warn('Não foi possível alterar o apelido do bot:', err.message);
     }
 
-    return interaction.reply({ content: '✅ Personalização atualizada com sucesso.', ephemeral: true });
+    return interaction.reply({ content: '✅ Personalização atualizada com sucesso.', flags: MessageFlags.Ephemeral });
   }
 
   // Imagem por categoria
   if (id.startsWith('modal:imagem:')) {
     const categoria = id.split(':')[2];
     const cat = CATEGORIAS_IMAGEM.find(c => c.id === categoria);
-    if (!cat) return interaction.reply({ content: 'Categoria não encontrada.', ephemeral: true });
+    if (!cat) return interaction.reply({ content: 'Categoria não encontrada.', flags: MessageFlags.Ephemeral });
 
     const url = interaction.fields.getTextInputValue('url')?.trim() || null;
     if (!store.images) store.images = { product: null, ticket: null, logs: null };
@@ -954,7 +955,7 @@ async function handleModalSubmit(interaction) {
 
     return interaction.reply({
       content: url ? `✅ Imagem de **${cat.nome}** definida.` : `🗑️ Imagem de **${cat.nome}** removida.`,
-      ephemeral: true
+      flags: MessageFlags.Ephemeral
     });
   }
 
@@ -963,13 +964,13 @@ async function handleModalSubmit(interaction) {
     const horarios = texto.split(',').map(h => h.trim()).filter(h => /^\d{1,2}:\d{2}$/.test(h));
     store.sales.sendTimes = horarios;
     saveStore(interaction.guildId, store);
-    return interaction.reply({ content: `✅ Horários definidos: ${horarios.join(', ') || 'nenhum válido'}`, ephemeral: true });
+    return interaction.reply({ content: `✅ Horários definidos: ${horarios.join(', ') || 'nenhum válido'}`, flags: MessageFlags.Ephemeral });
   }
 
   if (id === 'modal:pix_key') {
     store.pixKey = interaction.fields.getTextInputValue('pixKey').trim();
     saveStore(interaction.guildId, store);
-    return interaction.reply({ content: `✅ Chave Pix configurada: \`${store.pixKey}\``, ephemeral: true });
+    return interaction.reply({ content: `✅ Chave Pix configurada: \`${store.pixKey}\``, flags: MessageFlags.Ephemeral });
   }
 
   if (id === 'modal:novo_produto') {
@@ -995,14 +996,14 @@ async function handleModalSubmit(interaction) {
 
     return interaction.reply({
       content: `✅ Produto "${nome}" adicionado (${jogo}) — R$ ${preco.toFixed(2)}, estoque: ${estoque}. Os cards foram atualizados nos canais de venda.`,
-      ephemeral: true
+      flags: MessageFlags.Ephemeral
     });
   }
 
   if (id.startsWith('modal:editar_produto:')) {
     const produtoId = id.split(':')[2];
     const produto = store.sales.products.find(p => p.id === produtoId);
-    if (!produto) return interaction.reply({ content: 'Produto não encontrado.', ephemeral: true });
+    if (!produto) return interaction.reply({ content: 'Produto não encontrado.', flags: MessageFlags.Ephemeral });
 
     produto.name = interaction.fields.getTextInputValue('nome').trim();
     produto.game = interaction.fields.getTextInputValue('jogo').trim();
@@ -1012,7 +1013,7 @@ async function handleModalSubmit(interaction) {
 
     saveStore(interaction.guildId, store);
     await publicarCards(interaction.guild).catch(() => {});
-    return interaction.reply({ content: `✅ Produto "${produto.name}" atualizado. Os cards foram atualizados nos canais de venda.`, ephemeral: true });
+    return interaction.reply({ content: `✅ Produto "${produto.name}" atualizado. Os cards foram atualizados nos canais de venda.`, flags: MessageFlags.Ephemeral });
   }
 
   if (id.startsWith('modal:definir_preco:')) {
@@ -1023,9 +1024,9 @@ async function handleModalSubmit(interaction) {
       produto.price = preco;
       saveStore(interaction.guildId, store);
       await publicarCards(interaction.guild).catch(() => {});
-      return interaction.reply({ content: `✅ Preço de "${produto.name}" atualizado para R$ ${preco.toFixed(2)}. Os cards foram atualizados nos canais de venda.`, ephemeral: true });
+      return interaction.reply({ content: `✅ Preço de "${produto.name}" atualizado para R$ ${preco.toFixed(2)}. Os cards foram atualizados nos canais de venda.`, flags: MessageFlags.Ephemeral });
     }
-    return interaction.reply({ content: 'Produto não encontrado.', ephemeral: true });
+    return interaction.reply({ content: 'Produto não encontrado.', flags: MessageFlags.Ephemeral });
   }
 
   if (id.startsWith('modal:definir_estoque:')) {
@@ -1036,16 +1037,16 @@ async function handleModalSubmit(interaction) {
       produto.stock = estoque;
       saveStore(interaction.guildId, store);
       await publicarCards(interaction.guild).catch(() => {});
-      return interaction.reply({ content: `✅ Estoque de "${produto.name}" atualizado para ${estoque}. Os cards foram atualizados nos canais de venda.`, ephemeral: true });
+      return interaction.reply({ content: `✅ Estoque de "${produto.name}" atualizado para ${estoque}. Os cards foram atualizados nos canais de venda.`, flags: MessageFlags.Ephemeral });
     }
-    return interaction.reply({ content: 'Produto não encontrado.', ephemeral: true });
+    return interaction.reply({ content: 'Produto não encontrado.', flags: MessageFlags.Ephemeral });
   }
 
   // Construtor de container: monta o container V2 e publica nos canais de envio
   if (id.startsWith('modal:construir_card:')) {
     const produtoId = id.split(':')[2];
     const produto = store.sales.products.find(p => p.id === produtoId);
-    if (!produto) return interaction.reply({ content: 'Produto não encontrado.', ephemeral: true });
+    if (!produto) return interaction.reply({ content: 'Produto não encontrado.', flags: MessageFlags.Ephemeral });
 
     const titulo = interaction.fields.getTextInputValue('titulo').trim() || produto.name;
     const divAcima = interaction.fields.getTextInputValue('divAcima').trim().toLowerCase().startsWith('s');
@@ -1077,7 +1078,7 @@ async function handleModalSubmit(interaction) {
         ? `✅ Card publicado em **${enviados}** canal(ais) com o botão 🛒 Comprar.`
         : '⚠️ Não foi possível publicar (nenhum canal de envio configurado ou sem permissão).');
 
-    return interaction.reply({ content: `🛠️ **Card construído!**\n\n${resumo}`, ephemeral: true });
+    return interaction.reply({ content: `🛠️ **Card construído!**\n\n${resumo}`, flags: MessageFlags.Ephemeral });
   }
 }
 
