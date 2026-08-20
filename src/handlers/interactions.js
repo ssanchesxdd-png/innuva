@@ -15,11 +15,14 @@ const {
   TextInputStyle,
   ButtonBuilder,
   ButtonStyle,
-  EmbedBuilder
+  ContainerBuilder,
+  TextDisplayBuilder,
+  SeparatorBuilder,
+  MessageFlags
 } = require('discord.js');
 
 const { loadStore, saveStore, generateId } = require('../storage');
-const { productCardEmbed, productManageListEmbed, ticketPanelEmbed } = require('../utils/embeds');
+const { productCardEmbed, ticketPanelEmbed } = require('../utils/embeds');
 const { abrirTicket, confirmarVenda, processarConfirmacaoVenda, pagarComSaldo, pagarComPix, cancelarSessao, fecharTicket } = require('./tickets');
 const { pagamentoAprovado, cancelarPendente, handleReferencia, handleComprarTambem } = require('./sales');
 
@@ -85,6 +88,24 @@ async function handleInteraction(interaction) {
 
 // ---------- HELPERS DE NAVEGACAO ----------
 
+const V2_FLAGS = [MessageFlags.IsComponentsV2];
+
+// Monta um "Container" do Components V2 no visual de embed:
+// cor de destaque na lateral + texto (markdown) + linha divisória + componentes dentro.
+function v2Container(store, { title, description, rows = [] }) {
+  const container = new ContainerBuilder()
+    .setAccentColor(parseInt((store.color || '#5865F2').replace('#', ''), 16))
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(`**${title}**\n\n${description}`)
+    )
+    .addSeparatorComponents(new SeparatorBuilder());
+
+  for (const row of rows) {
+    container.addActionRowComponents(row);
+  }
+  return container;
+}
+
 function botaoVoltar(destino) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -96,20 +117,6 @@ function botaoVoltar(destino) {
 
 async function mostrarMenuRoot(interaction) {
   const store = loadStore(interaction.guildId);
-  const embed = new EmbedBuilder()
-    .setTitle('⚙️ Configuração da Loja')
-    .setDescription(
-      `**CONFIGURAÇÃO DA LOJA**\n\n` +
-      `- **Configuração de vendas:** adicione produtos, preços e estoque.\n` +
-      `- **Configuração de tickets:** setar o canal de suporte.\n` +
-      `- **Configurar logs:** setar os canais de log públicos e privados.\n` +
-      `- **Personalização:** personalize o nome do bot, da loja e escolha a cor de acordo com o tema que quiser.\n\n` +
-      `━━━━━━━━━━━━━━━━━━━━\n\n` +
-      `Selecione uma categoria abaixo ⬇️`
-    )
-    .setColor(store.color || '#5865F2')
-    .setFooter({ text: store.storeName, iconURL: store.logoUrl || undefined })
-    .setTimestamp();
 
   const menu = new StringSelectMenuBuilder()
     .setCustomId('config:menu:root')
@@ -121,11 +128,22 @@ async function mostrarMenuRoot(interaction) {
       { label: 'Personalização', value: 'personalizacao', emoji: '🎨', description: 'Nome do bot, nome da loja, cor e imagens' }
     ]);
 
-  const row = new ActionRowBuilder().addComponents(menu);
-  await interaction.update({ content: null, embeds: [embed], components: [row] });
+  const container = v2Container(store, {
+    title: '⚙️ Configuração da Loja',
+    description:
+      `- **Configuração de vendas:** adicione produtos, preços e estoque.\n` +
+      `- **Configuração de tickets:** setar o canal de suporte.\n` +
+      `- **Configurar logs:** setar os canais de log públicos e privados.\n` +
+      `- **Personalização:** personalize o nome do bot, da loja e escolha a cor de acordo com o tema que quiser.`,
+    rows: [new ActionRowBuilder().addComponents(menu)]
+  });
+
+  await interaction.update({ components: [container], flags: V2_FLAGS });
 }
 
 async function mostrarMenuVendas(interaction) {
+  const store = loadStore(interaction.guildId);
+
   const menu = new StringSelectMenuBuilder()
     .setCustomId('config:menu:vendas')
     .setPlaceholder('O que deseja configurar em Vendas?')
@@ -140,10 +158,14 @@ async function mostrarMenuVendas(interaction) {
       { label: 'Horários de Reenvio Diário', value: 'horarios_envio', emoji: '⏰' },
       { label: 'Chave Pix (pagamentos pendentes)', value: 'pix_key', emoji: '🏦' }
     ]);
-  const row = new ActionRowBuilder().addComponents(menu);
-  const embed = new EmbedBuilder().setTitle('💰 Configurações de Vendas').setColor('#5865F2')
-    .setDescription('Escolha o que deseja configurar.');
-  await interaction.update({ content: null, embeds: [embed], components: [row, botaoVoltar('root')] });
+
+  const container = v2Container(store, {
+    title: '💰 Configurações de Vendas',
+    description: 'Escolha o que deseja configurar.',
+    rows: [new ActionRowBuilder().addComponents(menu), botaoVoltar('root')]
+  });
+
+  await interaction.update({ components: [container], flags: V2_FLAGS });
 }
 
 // ---------- STRING SELECT MENUS ----------
@@ -171,8 +193,18 @@ async function handleSelectMenu(interaction) {
     if (escolha === 'remover_produto') return mostrarSelecaoProduto(interaction, store, 'remover');
     if (escolha === 'pix_key') return abrirModalPixKey(interaction, store);
     if (escolha === 'listar_produtos') {
-      const embed = productManageListEmbed(store);
-      return interaction.update({ content: null, embeds: [embed], components: [botaoVoltar('vendas')] });
+      const lista = store.sales.products.length > 0
+        ? store.sales.products.map(p =>
+            `📦 **${p.name}** (${p.game})\n` +
+            `&nbsp;&nbsp;💰 R$ ${p.price.toFixed(2)} · 📦 Estoque: ${p.stock} · ID: \`${p.id}\``
+          ).join('\n\n')
+        : 'Nenhum produto cadastrado ainda.';
+      const container = v2Container(store, {
+        title: '📋 Produtos Cadastrados',
+        description: lista,
+        rows: [botaoVoltar('vendas')]
+      });
+      return interaction.update({ components: [container], flags: V2_FLAGS });
     }
   }
 
@@ -229,17 +261,23 @@ async function handleSelectMenu(interaction) {
 }
 
 async function mostrarMenuTicket(interaction) {
+  const store = loadStore(interaction.guildId);
   const channelMenu = new ChannelSelectMenuBuilder()
     .setCustomId('config:canal:ticket_panel')
     .setPlaceholder('Selecione o canal do painel de suporte')
     .setChannelTypes(ChannelType.GuildText);
-  const row = new ActionRowBuilder().addComponents(channelMenu);
-  const embed = new EmbedBuilder().setTitle('🎫 Configuração de Ticket').setColor('#5865F2')
-    .setDescription('Selecione em qual canal o painel de "Abrir Ticket" será publicado.');
-  await interaction.update({ content: null, embeds: [embed], components: [row, botaoVoltar('root')] });
+
+  const container = v2Container(store, {
+    title: '🎫 Configuração de Ticket',
+    description: 'Selecione em qual canal o painel de "Abrir Ticket" será publicado.',
+    rows: [new ActionRowBuilder().addComponents(channelMenu), botaoVoltar('root')]
+  });
+
+  await interaction.update({ components: [container], flags: V2_FLAGS });
 }
 
 async function mostrarMenuLogs(interaction) {
+  const store = loadStore(interaction.guildId);
   const menu = new StringSelectMenuBuilder()
     .setCustomId('config:menu:logs')
     .setPlaceholder('Qual log deseja configurar?')
@@ -247,21 +285,19 @@ async function mostrarMenuLogs(interaction) {
       { label: 'Log Privado (staff)', value: 'privado', emoji: '🔒' },
       { label: 'Log Público (todos)', value: 'publico', emoji: '📢' }
     ]);
-  const row = new ActionRowBuilder().addComponents(menu);
-  const embed = new EmbedBuilder().setTitle('📋 Configuração de Logs').setColor('#5865F2')
-    .setDescription('Escolha qual tipo de log deseja configurar.');
-  await interaction.update({ content: null, embeds: [embed], components: [row, botaoVoltar('root')] });
+
+  const container = v2Container(store, {
+    title: '📋 Configuração de Logs',
+    description: 'Escolha qual tipo de log deseja configurar.',
+    rows: [new ActionRowBuilder().addComponents(menu), botaoVoltar('root')]
+  });
+
+  await interaction.update({ components: [container], flags: V2_FLAGS });
 }
 
 // Menu de personalizacao: cor (com emojis), imagens por categoria, nome/logo
 async function mostrarMenuPersonalizacao(interaction, store) {
-  const embed = new EmbedBuilder()
-    .setTitle('🎨 Personalização')
-    .setDescription(
-      `**Cor atual:** ${CORES.find(c => c.hex === store.color)?.emoji || '🎨'} ${CORES.find(c => c.hex === store.color)?.nome || store.color}\n\n` +
-      'Escolha abaixo o que deseja configurar:'
-    )
-    .setColor(store.color || '#5865F2');
+  const corAtual = CORES.find(c => c.hex === store.color);
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -281,18 +317,20 @@ async function mostrarMenuPersonalizacao(interaction, store) {
       .setEmoji('✏️')
   );
 
-  await interaction.update({ content: null, embeds: [embed], components: [row, botaoVoltar('root')] });
+  const container = v2Container(store, {
+    title: '🎨 Personalização',
+    description:
+      `**Cor atual:** ${corAtual ? corAtual.emoji + ' ' + corAtual.nome : store.color}\n\n` +
+      'Escolha abaixo o que deseja configurar:',
+    rows: [row, botaoVoltar('root')]
+  });
+
+  await interaction.update({ components: [container], flags: V2_FLAGS });
 }
 
 // Grade de cores com emojis (12 cores, 3 linhas de 4)
 async function mostrarGradeCores(interaction, store) {
-  const embed = new EmbedBuilder()
-    .setTitle('🎨 Escolha a cor da loja')
-    .setDescription(
-      `Cor atual: **${CORES.find(c => c.hex === store.color)?.emoji || '🎨'}** ${CORES.find(c => c.hex === store.color)?.nome || store.color}\n\n` +
-      'Clique em uma cor para aplicar em **TODAS** as embeds do bot.'
-    )
-    .setColor(store.color || '#5865F2');
+  const corAtual = CORES.find(c => c.hex === store.color);
 
   const rows = [];
   for (let i = 0; i < CORES.length; i += 4) {
@@ -308,17 +346,21 @@ async function mostrarGradeCores(interaction, store) {
     );
     rows.push(row);
   }
+  rows.push(botaoVoltar('personalizacao'));
 
-  await interaction.update({ content: null, embeds: [embed], components: [...rows, botaoVoltar('personalizacao')] });
+  const container = v2Container(store, {
+    title: '🎨 Escolha a cor da loja',
+    description:
+      `Cor atual: **${corAtual ? corAtual.emoji + ' ' + corAtual.nome : store.color}**\n\n` +
+      'Clique em uma cor para aplicar em **TODAS** as embeds do bot.',
+    rows
+  });
+
+  await interaction.update({ components: [container], flags: V2_FLAGS });
 }
 
 // Categorias de imagem das embeds
 async function mostrarMenuImagens(interaction, store) {
-  const embed = new EmbedBuilder()
-    .setTitle('🖼️ Imagens das Embeds')
-    .setDescription('Escolha a categoria e defina a imagem (banner) dela:')
-    .setColor(store.color || '#5865F2');
-
   const row = new ActionRowBuilder().addComponents(
     CATEGORIAS_IMAGEM.map(cat =>
       new ButtonBuilder()
@@ -329,28 +371,34 @@ async function mostrarMenuImagens(interaction, store) {
     )
   );
 
-  const desc = new EmbedBuilder()
-    .setTitle('🖼️ Categorias de imagem')
-    .setDescription(
+  const container = v2Container(store, {
+    title: '🖼️ Imagens das Embeds',
+    description:
+      'Escolha a categoria e defina a imagem (banner) dela:\n\n' +
       CATEGORIAS_IMAGEM.map(cat =>
         `${cat.emoji} **${cat.nome}** — ${cat.descricao}` +
-        (store.images?.[cat.id] ? `\n&nbsp;&nbsp;🔗 Atual: \`${store.images[cat.id]}\`` : '')
-      ).join('\n\n')
-    )
-    .setColor(store.color || '#5865F2');
+        (store.images?.[cat.id] ? `\n🔗 Atual: \`${store.images[cat.id]}\`` : '')
+      ).join('\n\n'),
+    rows: [row, botaoVoltar('personalizacao')]
+  });
 
-  await interaction.update({ content: null, embeds: [embed, desc], components: [row, botaoVoltar('personalizacao')] });
+  await interaction.update({ components: [container], flags: V2_FLAGS });
 }
 
 async function mostrarSelecaoCanalLog(interaction, tipo) {
+  const store = loadStore(interaction.guildId);
   const channelMenu = new ChannelSelectMenuBuilder()
     .setCustomId(`config:canal:log_${tipo}`)
     .setPlaceholder(`Selecione o canal de log ${tipo}`)
     .setChannelTypes(ChannelType.GuildText);
-  const row = new ActionRowBuilder().addComponents(channelMenu);
-  const embed = new EmbedBuilder().setTitle(`📋 Log ${tipo}`).setColor('#5865F2')
-    .setDescription(`Selecione o canal de texto para o log ${tipo}.`);
-  await interaction.update({ content: null, embeds: [embed], components: [row, botaoVoltar('logs')] });
+
+  const container = v2Container(store, {
+    title: `📋 Log ${tipo}`,
+    description: `Selecione o canal de texto para o log ${tipo}.`,
+    rows: [new ActionRowBuilder().addComponents(channelMenu), botaoVoltar('logs')]
+  });
+
+  await interaction.update({ components: [container], flags: V2_FLAGS });
 }
 
 async function mostrarSelecaoCanaisEnvio(interaction, store) {
@@ -360,18 +408,24 @@ async function mostrarSelecaoCanaisEnvio(interaction, store) {
     .setMinValues(1)
     .setMaxValues(5)
     .setChannelTypes(ChannelType.GuildText);
-  const row = new ActionRowBuilder().addComponents(channelMenu);
-  const embed = new EmbedBuilder().setTitle('📢 Canais de Envio das Embeds').setColor('#5865F2')
-    .setDescription('Selecione em quais canais os cards de produto serão publicados e reenviados diariamente.');
-  await interaction.update({ content: null, embeds: [embed], components: [row, botaoVoltar('vendas')] });
+
+  const container = v2Container(store, {
+    title: '📢 Canais de Envio das Embeds',
+    description: 'Selecione em quais canais os cards de produto serão publicados e reenviados diariamente.',
+    rows: [new ActionRowBuilder().addComponents(channelMenu), botaoVoltar('vendas')]
+  });
+
+  await interaction.update({ components: [container], flags: V2_FLAGS });
 }
 
 async function mostrarSelecaoProduto(interaction, store, finalidade) {
   if (store.sales.products.length === 0) {
-    return interaction.update({
-      content: 'Nenhum produto cadastrado ainda. Use "Adicionar Produto" primeiro.',
-      embeds: [], components: [botaoVoltar('vendas')]
+    const container = v2Container(store, {
+      title: '📦 Produtos',
+      description: 'Nenhum produto cadastrado ainda. Use "Adicionar Produto" primeiro.',
+      rows: [botaoVoltar('vendas')]
     });
+    return interaction.update({ components: [container], flags: V2_FLAGS });
   }
 
   const descricaoPorFinalidade = {
@@ -390,27 +444,38 @@ async function mostrarSelecaoProduto(interaction, store, finalidade) {
       description: descricaoPorFinalidade[finalidade](p)
     })));
 
-  const row = new ActionRowBuilder().addComponents(menu);
-  await interaction.update({ content: null, embeds: [], components: [row, botaoVoltar('vendas')] });
+  const container = v2Container(store, {
+    title: '📦 Selecione o produto',
+    description: 'Escolha o produto na lista abaixo:',
+    rows: [new ActionRowBuilder().addComponents(menu), botaoVoltar('vendas')]
+  });
+
+  await interaction.update({ components: [container], flags: V2_FLAGS });
 }
 
 async function mostrarConfirmacaoRemover(interaction, store, produtoId) {
   const produto = store.sales.products.find(p => p.id === produtoId);
   if (!produto) {
-    return interaction.update({ content: 'Produto não encontrado.', embeds: [], components: [botaoVoltar('vendas')] });
+    const container = v2Container(store, {
+      title: '⚠️ Remoção',
+      description: 'Produto não encontrado.',
+      rows: [botaoVoltar('vendas')]
+    });
+    return interaction.update({ components: [container], flags: V2_FLAGS });
   }
-
-  const embed = new EmbedBuilder()
-    .setTitle('⚠️ Confirmar remoção')
-    .setDescription(`Tem certeza que deseja remover **${produto.name}** (${produto.game})? Essa ação não pode ser desfeita.`)
-    .setColor('#ED4245');
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(`config:confirmar_remocao:${produtoId}`).setLabel('Sim, remover').setStyle(ButtonStyle.Danger).setEmoji('🗑️'),
     new ButtonBuilder().setCustomId('config:voltar:vendas').setLabel('Cancelar').setStyle(ButtonStyle.Secondary)
   );
 
-  await interaction.update({ content: null, embeds: [embed], components: [row] });
+  const container = v2Container(store, {
+    title: '⚠️ Confirmar remoção',
+    description: `Tem certeza que deseja remover **${produto.name}** (${produto.game})? Essa ação não pode ser desfeita.`,
+    rows: [row]
+  });
+
+  await interaction.update({ components: [container], flags: V2_FLAGS });
 }
 
 // ---------- CHANNEL SELECT MENUS ----------
@@ -433,29 +498,46 @@ async function handleChannelSelectMenu(interaction) {
     store.panelMessageId = msg.id;
     saveStore(interaction.guildId, store);
 
-    return interaction.update({ content: `✅ Canal de ticket configurado: <#${canal}>`, embeds: [], components: [botaoVoltar('root')] });
+    const container = v2Container(store, {
+      title: '✅ Canal de ticket configurado',
+      description: `Painel "Abrir Ticket" publicado em <#${canal}>.`,
+      rows: [botaoVoltar('root')]
+    });
+    return interaction.update({ components: [container], flags: V2_FLAGS });
   }
 
   if (id === 'config:canal:log_privado') {
     store.logs.privateChannelId = canal;
     saveStore(interaction.guildId, store);
-    return interaction.update({ content: `✅ Log privado configurado: <#${canal}>`, embeds: [], components: [botaoVoltar('root')] });
+    const container = v2Container(store, {
+      title: '✅ Log privado configurado',
+      description: `Canal de log privado: <#${canal}>.`,
+      rows: [botaoVoltar('root')]
+    });
+    return interaction.update({ components: [container], flags: V2_FLAGS });
   }
 
   if (id === 'config:canal:log_publico') {
     store.logs.publicChannelId = canal;
     saveStore(interaction.guildId, store);
-    return interaction.update({ content: `✅ Log público configurado: <#${canal}>`, embeds: [], components: [botaoVoltar('root')] });
+    const container = v2Container(store, {
+      title: '✅ Log público configurado',
+      description: `Canal de log público: <#${canal}>.`,
+      rows: [botaoVoltar('root')]
+    });
+    return interaction.update({ components: [container], flags: V2_FLAGS });
   }
 
   if (id === 'config:canal:envio_vendas') {
     const canais = interaction.values;
     store.sales.sendChannelIds = canais;
     saveStore(interaction.guildId, store);
-    return interaction.update({
-      content: `✅ Canais de envio configurados: ${canais.map(c => `<#${c}>`).join(', ')}`,
-      embeds: [], components: [botaoVoltar('vendas')]
+    const container = v2Container(store, {
+      title: '✅ Canais de envio configurados',
+      description: `Canais: ${canais.map(c => `<#${c}>`).join(', ')}.`,
+      rows: [botaoVoltar('vendas')]
     });
+    return interaction.update({ components: [container], flags: V2_FLAGS });
   }
 }
 
@@ -534,11 +616,12 @@ async function handleButton(interaction) {
       }
     }
 
-    const embed = new EmbedBuilder()
-      .setTitle('🎨 Cor alterada!')
-      .setDescription(`${cor.emoji} **${cor.nome}** (${cor.hex}) aplicada em todas as embeds do bot.`)
-      .setColor(cor.hex);
-    return interaction.update({ content: null, embeds: [embed], components: [botaoVoltar('personalizacao')] });
+    const container = v2Container(store, {
+      title: '🎨 Cor alterada!',
+      description: `${cor.emoji} **${cor.nome}** (${cor.hex}) aplicada em todas as embeds do bot.`,
+      rows: [botaoVoltar('personalizacao')]
+    });
+    return interaction.update({ components: [container], flags: V2_FLAGS });
   }
 
   // ---- Config: imagens por categoria ----
@@ -556,10 +639,12 @@ async function handleButton(interaction) {
     store.sales.products = store.sales.products.filter(p => p.id !== produtoId);
     saveStore(interaction.guildId, store);
     const removeu = store.sales.products.length < antes;
-    return interaction.update({
-      content: removeu ? '✅ Produto removido com sucesso.' : 'Produto não encontrado (já pode ter sido removido).',
-      embeds: [], components: [botaoVoltar('vendas')]
+    const container = v2Container(store, {
+      title: removeu ? '🗑️ Produto removido' : '⚠️ Produto não encontrado',
+      description: removeu ? 'O produto foi removido com sucesso.' : 'O produto já pode ter sido removido.',
+      rows: [botaoVoltar('vendas')]
     });
+    return interaction.update({ components: [container], flags: V2_FLAGS });
   }
 }
 
