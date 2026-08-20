@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Preview — /config em Components V2 (Section / painel lateral)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'gg sans', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    background: #1e1f22;
+    color: #dbdee1;
+    min-height: 100vh;
+  }
+  header {
+    background: #2b2d31;
+    border-bottom: 2px solid #1e1f22;
+    padding: 18px 24px;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+  header h1 { font-size: 18px; color: #fff; margin-bottom: 6px; }
+  header h1 span { color: #5865F2; }
+  header p { font-size: 13px; color: #b5bac1; }
+  main { max-width: 720px; margin: 0 auto; padding: 28px 20px 80px; }
+  .section-title { font-size: 15px; font-weight: 700; color: #fff; margin: 30px 0 10px; }
+  .section-title:first-child { margin-top: 0; }
+  .note {
+    background: #2b2d31;
+    border: 1px solid #3f4147;
+    border-left: 4px solid #5865F2;
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 12.5px;
+    color: #b5bac1;
+    margin: 8px 0 18px;
+    line-height: 1.5;
+  }
+  .note b { color: #dbdee1; }
+
+  /* ===== Canal / mensagem ===== */
+  .channel { color: #949ba4; font-size: 12px; font-weight: 600; margin-bottom: 8px; }
+  .channel b { color: #f2f3f5; }
+
+  .message {
+    display: flex;
+    gap: 14px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    background: #313338;
+    margin-bottom: 14px;
+  }
+  .avatar {
+    width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
+    background: linear-gradient(135deg, #5865F2, #9b59b6);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .content { flex: 1; min-width: 0; }
+  .username { color: #fff; font-weight: 700; font-size: 14px; }
+  .bot-tag {
+    background: #5865F2; color: #fff; font-size: 10px; font-weight: 600;
+    padding: 1px 4px; border-radius: 4px; margin-left: 6px; vertical-align: 2px;
+  }
+  .timestamp { color: #949ba4; font-size: 11px; font-weight: 500; margin-left: 8px; }
+
+  /* ===== Container V2 (caixa cinza com barra de cor) ===== */
+  .container-v2 {
+    margin-top: 8px;
+    background: #2b2d31;
+    border-radius: 8px;
+    padding: 14px 16px 14px 18px;
+    position: relative;
+    border-top: 1px solid #3f4147;
+    border-right: 1px solid #3f4147;
+    border-bottom: 1px solid #3f4147;
+  }
+  .container-v2.accent::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: var(--accent, #5865F2);
+    border-radius: 8px 0 0 8px;
+  }
+  .td { font-size: 13.5px; line-height: 1.45; color: #dbdee1; }
+  .td b { color: #fff; }
+  .td .bullet { margin-right: 6px; }
+  .sep {
+    border: none;
+    border-top: 1px solid #3f4147;
+    margin: 12px 0;
+  }
+
+  /* ===== Section (type 9): linha com texto à esquerda e acessório à direita ===== */
+  .section {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 0;
+  }
+  .section + .section { border-top: 1px solid #3f4147; }
+  .section-label { font-size: 13px; font-weight: 600; color: #fff; line-height: 1.35; }
+  .section-label small { display: block; font-weight: 400; color: #949ba4; font-size: 11.5px; margin-top: 2px; }
+  .section .accessory { flex-shrink: 0; }
+
+  /* ===== Select menu (acessório) ===== */
+  .select {
+    background: #1e1f22;
+    border: 1px solid #3f4147;
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 13px;
+    color: #dbdee1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 200px;
+    justify-content: space-between;
+    cursor: pointer;
+  }
+  .select .caret { color: #80848e; font-size: 11px; }
+  .select.compact { min-width: 150px; }
+
+  /* ===== Botão (acessório alternativo) ===== */
+  .btn {
+    background: #4e5058;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 5px 12px;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn.primary { background: #5865F2; }
+  .btn.success { background: #23a559; }
+  .btn.danger { background: #da373c; }
+
+  .caption { font-size: 12px; color: #949ba4; margin: -4px 0 22px 4px; line-height: 1.5; }
+  .caption code { background: #2b2d31; padding: 1px 5px; border-radius: 4px; font-size: 11px; color: #b5bac1; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Preview — <span>/config</span> em Components V2 com <span>Section (type 9)</span></h1>
+  <p>Como ficaria o menu "embutido na linha" com o acessório à direita (estilo painel lateral)</p>
+</header>
+<main>
+
+  <div class="channel"><b># 🔧 configuração</b> · como apareceria no Discord</div>
+
+  <div class="message">
+    <div class="avatar">🤖</div>
+    <div class="content">
+      <div>
+        <span class="username">Innova</span><span class="bot-tag">BOT</span>
+        <span class="timestamp">hoje às 14:32</span>
+      </div>
+
+      <div class="container-v2 accent" style="--accent:#5865F2">
+        <div class="td">
+          <b>⚙️ Configuração da Loja</b><br><br>
+          <span class="bullet">-</span> <b>Configuração de vendas:</b> adicione produtos, preços e estoque.<br>
+          <span class="bullet">-</span> <b>Configuração de tickets:</b> setar o canal de suporte.<br>
+          <span class="bullet">-</span> <b>Configuração de logs:</b> setar os canais de log públicos e privados.<br>
+          <span class="bullet">-</span> <b>Personalização:</b> personalize o nome do bot, da loja e escolha a cor.
+        </div>
+        <hr class="sep">
+
+        <div class="section">
+          <div class="section-label">Selecione uma categoria
+            <small>Vendas, tickets, logs ou personalização</small>
+          </div>
+          <div class="select accessory">Selecione... <span class="caret">▾</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="caption">Exemplo 1 — <b>menu principal</b>: Section com o texto à esquerda e o <code>&lt;select&gt;</code> encostado na borda direita do container. Uma linha fina separa a Section do texto acima.</div>
+
+  <div class="message">
+    <div class="avatar">🤖</div>
+    <div class="content">
+      <div>
+        <span class="username">Innova</span><span class="bot-tag">BOT</span>
+        <span class="timestamp">hoje às 14:33</span>
+      </div>
+
+      <div class="container-v2 accent" style="--accent:#2ecc71">
+        <div class="td"><b>🎨 Personalização</b><br><br>Cor atual: 💜 Roxo (</div>
+        <div class="section">
+          <div class="section-label">Cor da loja</div>
+          <div class="btn accessory primary">🎨 Escolher Cor</div>
+        </div>
+        <div class="section">
+          <div class="section-label">Imagens das embeds</div>
+          <div class="btn accessory">🖼️ Imagens</div>
+        </div>
+        <div class="section">
+          <div class="section-label">Nome, logo e info</div>
+          <div class="btn accessory">✏️ Editar</div>
+        </div>
+        <hr class="sep">
+        <div class="section">
+          <div class="section-label">Voltar ao menu</div>
+          <div class="btn accessory">⬅️ Voltar</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="caption">Exemplo 2 — <b>Personalização</b>: várias Sections empilhadas (cada uma com sua linha divisória), cada uma com seu acessório à direita — cada linha é clicável separadamente.</div>
+
+  <div class="message">
+    <div class="avatar">🤖</div>
+    <div class="content">
+      <div>
+        <span class="username">Innova</span><span class="bot-tag">BOT</span>
+        <span class="timestamp">hoje às 14:34</span>
+      </div>
+
+      <div class="container-v2 accent" style="--accent:#ED4245">
+        <div class="td"><b>🗑️ Remover produto</b><br><br>Tem certeza que deseja remover <b>R$ 40</b> de <b>V-Bucks (Fortnite)</b>?</div>
+        <hr class="sep">
+        <div class="section">
+          <div class="section-label">Ação</div>
+          <div style="display:flex;gap:8px" class="accessory">
+            <div class="btn danger">🗑️ Sim, remover</div>
+            <div class="btn">Cancelar</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="caption">Exemplo 3 — <b>Confirmação de remoção</b>: acessórios de botões ficam alinhados à direita da linha de texto, em vez de ocuparem linhas inteiras embaixo.</div>
+
+  <div class="note">
+    <b>Resumo:</b> na Section (type 9), o acessório (select, botão, etc.) fica <b>na mesma linha do texto</b>, ancorado à direita do container — visual de "lista de opções" mais compacto que os botões de linha inteira atuais. No código fica: <code>new SectionBuilder().setLabel(TextDisplay).setAccessory(select)</code>.
+  </div>
+
+</main>
+</body>
+</html>

@@ -1,18 +1,16 @@
 // src/commands/config.js
 // Comando /config: abre o painel de configuracao da loja (apenas staff).
-// Usa Components V2: Container (visual de embed com cor da loja) + TextDisplay + Separator.
+// Usa Components V2: Container (visual de embed com cor da loja) + TextDisplay +
+// Separator + Section (texto com o menu/acessório colado à direita).
 
 const {
   SlashCommandBuilder,
   StringSelectMenuBuilder,
-  ActionRowBuilder,
-  ContainerBuilder,
-  TextDisplayBuilder,
-  SeparatorBuilder,
   MessageFlags,
   PermissionFlagsBits
 } = require('discord.js');
 const { loadStore } = require('../storage');
+const { v2Container } = require('../utils/v2');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -33,19 +31,15 @@ module.exports = {
         { label: 'Personalização', value: 'personalizacao', emoji: '🎨', description: 'Nome do bot, nome da loja, cor e imagens' }
       ]);
 
-    const container = new ContainerBuilder()
-      .setAccentColor(parseInt((store.color || '#5865F2').replace('#', ''), 16))
-      .addTextDisplayComponents(
-        new TextDisplayBuilder().setContent(
-          '**⚙️ Configuração da Loja**\n\n' +
-          `- **Configuração de vendas:** adicione produtos, preços e estoque.\n` +
-          `- **Configuração de tickets:** setar o canal de suporte.\n` +
-          `- **Configurar logs:** setar os canais de log públicos e privados.\n` +
-          `- **Personalização:** personalize o nome do bot, da loja e escolha a cor de acordo com o tema que quiser.`
-        )
-      )
-      .addSeparatorComponents(new SeparatorBuilder())
-      .addActionRowComponents(new ActionRowBuilder().addComponents(menu));
+    const container = v2Container(store, {
+      title: '⚙️ Configuração da Loja',
+      description:
+        `- **Configuração de vendas:** adicione produtos, preços e estoque.\n` +
+        `- **Configuração de tickets:** setar o canal de suporte.\n` +
+        `- **Configuração de logs:** setar os canais de log públicos e privados.\n` +
+        `- **Personalização:** personalize o nome do bot, da loja e escolha a cor.`,
+      sections: [{ label: 'Selecione uma categoria', accessory: menu }]
+    });
 
     await interaction.reply({
       components: [container],

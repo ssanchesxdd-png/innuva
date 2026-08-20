@@ -14,15 +14,12 @@ const {
   TextInputBuilder,
   TextInputStyle,
   ButtonBuilder,
-  ButtonStyle,
-  ContainerBuilder,
-  TextDisplayBuilder,
-  SeparatorBuilder,
-  MessageFlags
+  ButtonStyle
 } = require('discord.js');
 
 const { loadStore, saveStore, generateId } = require('../storage');
 const { productCardEmbed, ticketPanelEmbed } = require('../utils/embeds');
+const { v2Container, updateV2 } = require('../utils/v2');
 const { abrirTicket, confirmarVenda, processarConfirmacaoVenda, pagarComSaldo, pagarComPix, cancelarSessao, fecharTicket } = require('./tickets');
 const { pagamentoAprovado, cancelarPendente, handleReferencia, handleComprarTambem } = require('./sales');
 
@@ -88,31 +85,13 @@ async function handleInteraction(interaction) {
 
 // ---------- HELPERS DE NAVEGACAO ----------
 
-const V2_FLAGS = [MessageFlags.IsComponentsV2];
-
-// Monta um "Container" do Components V2 no visual de embed:
-// cor de destaque na lateral + texto (markdown) + linha divisória + componentes dentro.
-function v2Container(store, { title, description, rows = [] }) {
-  const container = new ContainerBuilder()
-    .setAccentColor(parseInt((store.color || '#5865F2').replace('#', ''), 16))
-    .addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(`**${title}**\n\n${description}`)
-    )
-    .addSeparatorComponents(new SeparatorBuilder());
-
-  for (const row of rows) {
-    container.addActionRowComponents(row);
-  }
-  return container;
-}
-
-function botaoVoltar(destino) {
-  return new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId(`config:voltar:${destino}`)
-      .setLabel('⬅️ Voltar')
-      .setStyle(ButtonStyle.Secondary)
-  );
+// Section "Voltar" com o botão colado à direita da linha.
+function secaoVoltar(destino) {
+  const botao = new ButtonBuilder()
+    .setCustomId(`config:voltar:${destino}`)
+    .setLabel('⬅️ Voltar')
+    .setStyle(ButtonStyle.Secondary);
+  return { label: 'Navegação', accessory: botao };
 }
 
 async function mostrarMenuRoot(interaction) {
@@ -133,12 +112,12 @@ async function mostrarMenuRoot(interaction) {
     description:
       `- **Configuração de vendas:** adicione produtos, preços e estoque.\n` +
       `- **Configuração de tickets:** setar o canal de suporte.\n` +
-      `- **Configurar logs:** setar os canais de log públicos e privados.\n` +
-      `- **Personalização:** personalize o nome do bot, da loja e escolha a cor de acordo com o tema que quiser.`,
-    rows: [new ActionRowBuilder().addComponents(menu)]
+      `- **Configuração de logs:** setar os canais de log públicos e privados.\n` +
+      `- **Personalização:** personalize o nome do bot, da loja e escolha a cor.`,
+    sections: [{ label: 'Selecione uma categoria', accessory: menu }]
   });
 
-  await interaction.update({ components: [container], flags: V2_FLAGS });
+  await updateV2(interaction, container);
 }
 
 async function mostrarMenuVendas(interaction) {
@@ -162,10 +141,13 @@ async function mostrarMenuVendas(interaction) {
   const container = v2Container(store, {
     title: '💰 Configurações de Vendas',
     description: 'Escolha o que deseja configurar.',
-    rows: [new ActionRowBuilder().addComponents(menu), botaoVoltar('root')]
+    sections: [
+      { label: 'O que deseja configurar?', accessory: menu },
+      secaoVoltar('root')
+    ]
   });
 
-  await interaction.update({ components: [container], flags: V2_FLAGS });
+  await updateV2(interaction, container);
 }
 
 // ---------- STRING SELECT MENUS ----------
@@ -202,9 +184,9 @@ async function handleSelectMenu(interaction) {
       const container = v2Container(store, {
         title: '📋 Produtos Cadastrados',
         description: lista,
-        rows: [botaoVoltar('vendas')]
+        sections: [secaoVoltar('vendas')]
       });
-      return interaction.update({ components: [container], flags: V2_FLAGS });
+      return updateV2(interaction, container);
     }
   }
 
@@ -270,10 +252,13 @@ async function mostrarMenuTicket(interaction) {
   const container = v2Container(store, {
     title: '🎫 Configuração de Ticket',
     description: 'Selecione em qual canal o painel de "Abrir Ticket" será publicado.',
-    rows: [new ActionRowBuilder().addComponents(channelMenu), botaoVoltar('root')]
+    sections: [
+      { label: 'Canal do painel de suporte', accessory: channelMenu },
+      secaoVoltar('root')
+    ]
   });
 
-  await interaction.update({ components: [container], flags: V2_FLAGS });
+  await updateV2(interaction, container);
 }
 
 async function mostrarMenuLogs(interaction) {
@@ -289,43 +274,42 @@ async function mostrarMenuLogs(interaction) {
   const container = v2Container(store, {
     title: '📋 Configuração de Logs',
     description: 'Escolha qual tipo de log deseja configurar.',
-    rows: [new ActionRowBuilder().addComponents(menu), botaoVoltar('root')]
+    sections: [
+      { label: 'Qual log deseja configurar?', accessory: menu },
+      secaoVoltar('root')
+    ]
   });
 
-  await interaction.update({ components: [container], flags: V2_FLAGS });
+  await updateV2(interaction, container);
 }
 
 // Menu de personalizacao: cor (com emojis), imagens por categoria, nome/logo
 async function mostrarMenuPersonalizacao(interaction, store) {
   const corAtual = CORES.find(c => c.hex === store.color);
 
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('config:abrir_cores')
-      .setLabel('Escolher Cor')
-      .setStyle(ButtonStyle.Primary)
-      .setEmoji('🎨'),
-    new ButtonBuilder()
-      .setCustomId('config:abrir_imagens')
-      .setLabel('Imagens das Embeds')
-      .setStyle(ButtonStyle.Primary)
-      .setEmoji('🖼️'),
-    new ButtonBuilder()
-      .setCustomId('config:abrir_infos')
-      .setLabel('Nome, Logo e Info')
-      .setStyle(ButtonStyle.Primary)
-      .setEmoji('✏️')
-  );
-
   const container = v2Container(store, {
     title: '🎨 Personalização',
     description:
       `**Cor atual:** ${corAtual ? corAtual.emoji + ' ' + corAtual.nome : store.color}\n\n` +
       'Escolha abaixo o que deseja configurar:',
-    rows: [row, botaoVoltar('root')]
+    sections: [
+      {
+        label: '🎨 Cor da loja',
+        accessory: new ButtonBuilder().setCustomId('config:abrir_cores').setLabel('Escolher').setStyle(ButtonStyle.Primary)
+      },
+      {
+        label: '🖼️ Imagens das embeds',
+        accessory: new ButtonBuilder().setCustomId('config:abrir_imagens').setLabel('Editar').setStyle(ButtonStyle.Primary)
+      },
+      {
+        label: '✏️ Nome, logo e info',
+        accessory: new ButtonBuilder().setCustomId('config:abrir_infos').setLabel('Editar').setStyle(ButtonStyle.Primary)
+      },
+      secaoVoltar('root')
+    ]
   });
 
-  await interaction.update({ components: [container], flags: V2_FLAGS });
+  await updateV2(interaction, container);
 }
 
 // Grade de cores com emojis (12 cores, 3 linhas de 4)
@@ -346,43 +330,38 @@ async function mostrarGradeCores(interaction, store) {
     );
     rows.push(row);
   }
-  rows.push(botaoVoltar('personalizacao'));
 
   const container = v2Container(store, {
     title: '🎨 Escolha a cor da loja',
     description:
       `Cor atual: **${corAtual ? corAtual.emoji + ' ' + corAtual.nome : store.color}**\n\n` +
       'Clique em uma cor para aplicar em **TODAS** as embeds do bot.',
-    rows
+    rows,
+    sections: [secaoVoltar('personalizacao')]
   });
 
-  await interaction.update({ components: [container], flags: V2_FLAGS });
+  await updateV2(interaction, container);
 }
 
 // Categorias de imagem das embeds
 async function mostrarMenuImagens(interaction, store) {
-  const row = new ActionRowBuilder().addComponents(
-    CATEGORIAS_IMAGEM.map(cat =>
-      new ButtonBuilder()
-        .setCustomId(`config:imagem:${cat.id}`)
-        .setLabel(cat.nome)
-        .setEmoji(cat.emoji)
-        .setStyle(ButtonStyle.Secondary)
-    )
-  );
+  const sections = CATEGORIAS_IMAGEM.map(cat => ({
+    label:
+      `${cat.emoji} **${cat.nome}** — ${cat.descricao}` +
+      (store.images?.[cat.id] ? `\n🔗 Atual: \`${store.images[cat.id]}\`` : ''),
+    accessory: new ButtonBuilder()
+      .setCustomId(`config:imagem:${cat.id}`)
+      .setLabel('Definir')
+      .setStyle(ButtonStyle.Secondary)
+  }));
 
   const container = v2Container(store, {
     title: '🖼️ Imagens das Embeds',
-    description:
-      'Escolha a categoria e defina a imagem (banner) dela:\n\n' +
-      CATEGORIAS_IMAGEM.map(cat =>
-        `${cat.emoji} **${cat.nome}** — ${cat.descricao}` +
-        (store.images?.[cat.id] ? `\n🔗 Atual: \`${store.images[cat.id]}\`` : '')
-      ).join('\n\n'),
-    rows: [row, botaoVoltar('personalizacao')]
+    description: 'Escolha a categoria e defina a imagem (banner) dela:',
+    sections: [...sections, secaoVoltar('personalizacao')]
   });
 
-  await interaction.update({ components: [container], flags: V2_FLAGS });
+  await updateV2(interaction, container);
 }
 
 async function mostrarSelecaoCanalLog(interaction, tipo) {
@@ -395,10 +374,13 @@ async function mostrarSelecaoCanalLog(interaction, tipo) {
   const container = v2Container(store, {
     title: `📋 Log ${tipo}`,
     description: `Selecione o canal de texto para o log ${tipo}.`,
-    rows: [new ActionRowBuilder().addComponents(channelMenu), botaoVoltar('logs')]
+    sections: [
+      { label: `Canal de log ${tipo}`, accessory: channelMenu },
+      secaoVoltar('logs')
+    ]
   });
 
-  await interaction.update({ components: [container], flags: V2_FLAGS });
+  await updateV2(interaction, container);
 }
 
 async function mostrarSelecaoCanaisEnvio(interaction, store) {
@@ -412,10 +394,13 @@ async function mostrarSelecaoCanaisEnvio(interaction, store) {
   const container = v2Container(store, {
     title: '📢 Canais de Envio das Embeds',
     description: 'Selecione em quais canais os cards de produto serão publicados e reenviados diariamente.',
-    rows: [new ActionRowBuilder().addComponents(channelMenu), botaoVoltar('vendas')]
+    sections: [
+      { label: 'Canais de envio', accessory: channelMenu },
+      secaoVoltar('vendas')
+    ]
   });
 
-  await interaction.update({ components: [container], flags: V2_FLAGS });
+  await updateV2(interaction, container);
 }
 
 async function mostrarSelecaoProduto(interaction, store, finalidade) {
@@ -423,9 +408,9 @@ async function mostrarSelecaoProduto(interaction, store, finalidade) {
     const container = v2Container(store, {
       title: '📦 Produtos',
       description: 'Nenhum produto cadastrado ainda. Use "Adicionar Produto" primeiro.',
-      rows: [botaoVoltar('vendas')]
+      sections: [secaoVoltar('vendas')]
     });
-    return interaction.update({ components: [container], flags: V2_FLAGS });
+    return updateV2(interaction, container);
   }
 
   const descricaoPorFinalidade = {
@@ -447,10 +432,13 @@ async function mostrarSelecaoProduto(interaction, store, finalidade) {
   const container = v2Container(store, {
     title: '📦 Selecione o produto',
     description: 'Escolha o produto na lista abaixo:',
-    rows: [new ActionRowBuilder().addComponents(menu), botaoVoltar('vendas')]
+    sections: [
+      { label: 'Produto', accessory: menu },
+      secaoVoltar('vendas')
+    ]
   });
 
-  await interaction.update({ components: [container], flags: V2_FLAGS });
+  await updateV2(interaction, container);
 }
 
 async function mostrarConfirmacaoRemover(interaction, store, produtoId) {
@@ -459,23 +447,33 @@ async function mostrarConfirmacaoRemover(interaction, store, produtoId) {
     const container = v2Container(store, {
       title: '⚠️ Remoção',
       description: 'Produto não encontrado.',
-      rows: [botaoVoltar('vendas')]
+      sections: [secaoVoltar('vendas')]
     });
-    return interaction.update({ components: [container], flags: V2_FLAGS });
+    return updateV2(interaction, container);
   }
-
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`config:confirmar_remocao:${produtoId}`).setLabel('Sim, remover').setStyle(ButtonStyle.Danger).setEmoji('🗑️'),
-    new ButtonBuilder().setCustomId('config:voltar:vendas').setLabel('Cancelar').setStyle(ButtonStyle.Secondary)
-  );
 
   const container = v2Container(store, {
     title: '⚠️ Confirmar remoção',
     description: `Tem certeza que deseja remover **${produto.name}** (${produto.game})? Essa ação não pode ser desfeita.`,
-    rows: [row]
+    sections: [
+      {
+        label: '🗑️ Excluir o produto',
+        accessory: new ButtonBuilder()
+          .setCustomId(`config:confirmar_remocao:${produtoId}`)
+          .setLabel('Sim, remover')
+          .setStyle(ButtonStyle.Danger)
+      },
+      {
+        label: 'Mudou de ideia?',
+        accessory: new ButtonBuilder()
+          .setCustomId('config:voltar:vendas')
+          .setLabel('Cancelar')
+          .setStyle(ButtonStyle.Secondary)
+      }
+    ]
   });
 
-  await interaction.update({ components: [container], flags: V2_FLAGS });
+  await updateV2(interaction, container);
 }
 
 // ---------- CHANNEL SELECT MENUS ----------
@@ -501,9 +499,9 @@ async function handleChannelSelectMenu(interaction) {
     const container = v2Container(store, {
       title: '✅ Canal de ticket configurado',
       description: `Painel "Abrir Ticket" publicado em <#${canal}>.`,
-      rows: [botaoVoltar('root')]
+      sections: [secaoVoltar('root')]
     });
-    return interaction.update({ components: [container], flags: V2_FLAGS });
+    return updateV2(interaction, container);
   }
 
   if (id === 'config:canal:log_privado') {
@@ -512,9 +510,9 @@ async function handleChannelSelectMenu(interaction) {
     const container = v2Container(store, {
       title: '✅ Log privado configurado',
       description: `Canal de log privado: <#${canal}>.`,
-      rows: [botaoVoltar('root')]
+      sections: [secaoVoltar('root')]
     });
-    return interaction.update({ components: [container], flags: V2_FLAGS });
+    return updateV2(interaction, container);
   }
 
   if (id === 'config:canal:log_publico') {
@@ -523,9 +521,9 @@ async function handleChannelSelectMenu(interaction) {
     const container = v2Container(store, {
       title: '✅ Log público configurado',
       description: `Canal de log público: <#${canal}>.`,
-      rows: [botaoVoltar('root')]
+      sections: [secaoVoltar('root')]
     });
-    return interaction.update({ components: [container], flags: V2_FLAGS });
+    return updateV2(interaction, container);
   }
 
   if (id === 'config:canal:envio_vendas') {
@@ -535,9 +533,9 @@ async function handleChannelSelectMenu(interaction) {
     const container = v2Container(store, {
       title: '✅ Canais de envio configurados',
       description: `Canais: ${canais.map(c => `<#${c}>`).join(', ')}.`,
-      rows: [botaoVoltar('vendas')]
+      sections: [secaoVoltar('vendas')]
     });
-    return interaction.update({ components: [container], flags: V2_FLAGS });
+    return updateV2(interaction, container);
   }
 }
 
@@ -619,9 +617,9 @@ async function handleButton(interaction) {
     const container = v2Container(store, {
       title: '🎨 Cor alterada!',
       description: `${cor.emoji} **${cor.nome}** (${cor.hex}) aplicada em todas as embeds do bot.`,
-      rows: [botaoVoltar('personalizacao')]
+      sections: [secaoVoltar('personalizacao')]
     });
-    return interaction.update({ components: [container], flags: V2_FLAGS });
+    return updateV2(interaction, container);
   }
 
   // ---- Config: imagens por categoria ----
@@ -642,9 +640,9 @@ async function handleButton(interaction) {
     const container = v2Container(store, {
       title: removeu ? '🗑️ Produto removido' : '⚠️ Produto não encontrado',
       description: removeu ? 'O produto foi removido com sucesso.' : 'O produto já pode ter sido removido.',
-      rows: [botaoVoltar('vendas')]
+      sections: [secaoVoltar('vendas')]
     });
-    return interaction.update({ components: [container], flags: V2_FLAGS });
+    return updateV2(interaction, container);
   }
 }
 
@@ -757,7 +755,12 @@ async function abrirModalNovoProduto(interaction) {
 async function abrirModalEditarProduto(interaction, store, produtoId) {
   const produto = store.sales.products.find(p => p.id === produtoId);
   if (!produto) {
-    return interaction.update({ content: 'Produto não encontrado.', embeds: [], components: [botaoVoltar('vendas')] });
+    const container = v2Container(store, {
+      title: '⚠️ Produto',
+      description: 'Produto não encontrado.',
+      sections: [secaoVoltar('vendas')]
+    });
+    return updateV2(interaction, container);
   }
 
   const modal = new ModalBuilder().setCustomId(`modal:editar_produto:${produtoId}`).setTitle('Editar Produto');
