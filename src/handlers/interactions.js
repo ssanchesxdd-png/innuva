@@ -19,7 +19,7 @@ const {
 
 const { loadStore, saveStore, generateId } = require('../storage');
 const { productCardEmbed, ticketPanelEmbed } = require('../utils/embeds');
-const { v2Container, updateV2 } = require('../utils/v2');
+const { v2Container, updateV2, montarContainerProduto } = require('../utils/v2');
 const { publicarCards } = require('./publicar');
 const { abrirTicket, confirmarVenda, processarConfirmacaoVenda, pagarComSaldo, pagarComPix, cancelarSessao, fecharTicket } = require('./tickets');
 const { pagamentoAprovado, cancelarPendente, handleReferencia, handleComprarTambem } = require('./sales');
@@ -145,6 +145,13 @@ async function mostrarMenuVendas(interaction) {
     rows: [new ActionRowBuilder().addComponents(menu)],
     sections: [
       {
+        label: '🛠️ Construir Container de Produto (título, divisórias e info do jeito que você quiser)',
+        accessory: new ButtonBuilder()
+          .setCustomId('config:construir')
+          .setLabel('Construir')
+          .setStyle(ButtonStyle.Primary)
+      },
+      {
         label: '📤 Publicar/atualizar os cards de produto nos canais de envio',
         accessory: new ButtonBuilder()
           .setCustomId('config:publicar')
@@ -217,6 +224,10 @@ async function handleSelectMenu(interaction) {
 
   if (id === 'config:selecionar_produto:remover') {
     return mostrarConfirmacaoRemover(interaction, store, interaction.values[0]);
+  }
+
+  if (id === 'config:selecionar_produto:construir') {
+    return abrirModalConstruirCard(interaction, store, interaction.values[0]);
   }
 
   // /estoque: selecionar jogo -> posta um card por produto no canal
@@ -417,7 +428,8 @@ async function mostrarSelecaoProduto(interaction, store, finalidade) {
     preco: p => `Preço atual: R$ ${p.price.toFixed(2)}`,
     estoque: p => `Estoque atual: ${p.stock}`,
     editar: p => `${p.game} · R$ ${p.price.toFixed(2)} · estoque ${p.stock}`,
-    remover: p => `${p.game} · R$ ${p.price.toFixed(2)} · estoque ${p.stock}`
+    remover: p => `${p.game} · R$ ${p.price.toFixed(2)} · estoque ${p.stock}`,
+    construir: p => `${p.game} · R$ ${p.price.toFixed(2)} · estoque ${p.stock}`
   };
 
   const menu = new StringSelectMenuBuilder()
@@ -605,6 +617,11 @@ async function handleButton(interaction) {
       sections: [secaoVoltar('vendas')]
     });
     return updateV2(interaction, container);
+  }
+
+  // ---- Config: construir container de produto ----
+  if (id === 'config:construir') {
+    return mostrarSelecaoProduto(interaction, store, 'construir');
   }
 
   // ---- Config: escolha de cor (clique em um dos botões de cor) ----
@@ -827,6 +844,61 @@ async function abrirModalDefinirEstoque(interaction, produtoId) {
   await interaction.showModal(modal);
 }
 
+// Construtor de container de produto: titulo + divisorias + info livre
+async function abrirModalConstruirCard(interaction, store, produtoId) {
+  const produto = store.sales.products.find(p => p.id === produtoId);
+  if (!produto) {
+    const container = v2Container(store, {
+      title: '⚠️ Produto',
+      description: 'Produto não encontrado.',
+      sections: [secaoVoltar('vendas')]
+    });
+    return updateV2(interaction, container);
+  }
+
+  const modal = new ModalBuilder()
+    .setCustomId(`modal:construir_card:${produtoId}`)
+    .setTitle(`🛠️ Construir Card — ${produto.name.slice(0, 28)}`);
+
+  const tituloInput = new TextInputBuilder()
+    .setCustomId('titulo')
+    .setLabel('Título do card')
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder('Ex: 🎮 V-Bucks 10.000 (Fortnite)')
+    .setValue(produto.name)
+    .setRequired(true);
+
+  const divAcimaInput = new TextInputBuilder()
+    .setCustomId('divAcima')
+    .setLabel('Divisória antes da info? (sim/nao)')
+    .setStyle(TextInputStyle.Short)
+    .setValue('sim')
+    .setRequired(true);
+
+  const infoInput = new TextInputBuilder()
+    .setCustomId('info')
+    .setLabel('Info sobre o produto (o que quiser)')
+    .setStyle(TextInputStyle.Paragraph)
+    .setPlaceholder('Ex: 💰 Valor à vista: R$ 40,00\n📦 Restam: 5 unidades\n⚡ Entrega em até 30 min')
+    .setRequired(true);
+
+  const divAbaixoInput = new TextInputBuilder()
+    .setCustomId('divAbaixo')
+    .setLabel('Divisória depois da info? (sim/nao)')
+    .setStyle(TextInputStyle.Short)
+    .setValue('sim')
+    .setRequired(true);
+
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(tituloInput),
+    new ActionRowBuilder().addComponents(divAcimaInput),
+    new ActionRowBuilder().addComponents(infoInput),
+    new ActionRowBuilder().addComponents(divAbaixoInput)
+  );
+
+  await interaction.showModal(modal);
+}
+
 // ---------- MODAIS: PROCESSAR ENVIO ----------
 
 async function handleModalSubmit(interaction) {
@@ -967,6 +1039,45 @@ async function handleModalSubmit(interaction) {
       return interaction.reply({ content: `✅ Estoque de "${produto.name}" atualizado para ${estoque}. Os cards foram atualizados nos canais de venda.`, ephemeral: true });
     }
     return interaction.reply({ content: 'Produto não encontrado.', ephemeral: true });
+  }
+
+  // Construtor de container: monta o container V2 e publica nos canais de envio
+  if (id.startsWith('modal:construir_card:')) {
+    const produtoId = id.split(':')[2];
+    const produto = store.sales.products.find(p => p.id === produtoId);
+    if (!produto) return interaction.reply({ content: 'Produto não encontrado.', ephemeral: true });
+
+    const titulo = interaction.fields.getTextInputValue('titulo').trim() || produto.name;
+    const divAcima = interaction.fields.getTextInputValue('divAcima').trim().toLowerCase().startsWith('s');
+    const info = interaction.fields.getTextInputValue('info').trim();
+    const divAbaixo = interaction.fields.getTextInputValue('divAbaixo').trim().toLowerCase().startsWith('s');
+
+    const container = montarContainerProduto(store, produto, { titulo, info, divAcima, divAbaixo });
+
+    const canais = store.sales.sendChannelIds || [];
+    let enviados = 0;
+    if (canais.length > 0) {
+      for (const canalId of canais) {
+        const canal = await interaction.guild.channels.fetch(canalId).catch(() => null);
+        if (!canal) continue;
+        const msg = await canal.send({ components: [container], flags: [MessageFlags.IsComponentsV2] }).catch(() => null);
+        if (msg) enviados++;
+      }
+    } else {
+      const msg = await interaction.channel.send({ components: [container], flags: [MessageFlags.IsComponentsV2] }).catch(() => null);
+      if (msg) enviados++;
+    }
+
+    const resumo =
+      `**Título:** ${titulo}\n` +
+      `**Divisória acima:** ${divAcima ? 'sim' : 'não'}\n` +
+      `**Info:** ${info.slice(0, 80)}${info.length > 80 ? '…' : ''}\n` +
+      `**Divisória abaixo:** ${divAbaixo ? 'sim' : 'não'}\n\n` +
+      (enviados > 0
+        ? `✅ Card publicado em **${enviados}** canal(ais) com o botão 🛒 Comprar.`
+        : '⚠️ Não foi possível publicar (nenhum canal de envio configurado ou sem permissão).');
+
+    return interaction.reply({ content: `🛠️ **Card construído!**\n\n${resumo}`, ephemeral: true });
   }
 }
 

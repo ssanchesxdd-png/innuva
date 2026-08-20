@@ -10,6 +10,9 @@ const {
   TextDisplayBuilder,
   SeparatorBuilder,
   SectionBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
   MessageFlags
 } = require('discord.js');
 
@@ -43,9 +46,38 @@ function v2Container(store, { title, description, sections = [], rows = [] }) {
   return container;
 }
 
+// Container de produto com estrutura montável:
+// titulo (obrigatorio) + divisorias e blocos de texto na ordem escolhida.
+// Sempre termina com a linha do botao "Comprar".
+function montarContainerProduto(store, produto, { titulo, info, divAcima, divAbaixo }) {
+  const container = new ContainerBuilder()
+    .setAccentColor(parseInt((store.color || '#5865F2').replace('#', ''), 16))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`**${titulo}**`));
+
+  if (divAcima) container.addSeparatorComponents(new SeparatorBuilder());
+
+  if (info) {
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(info));
+  }
+
+  if (divAbaixo) container.addSeparatorComponents(new SeparatorBuilder());
+
+  container.addActionRowComponents(
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`publico:comprar_produto:${produto.id}`)
+        .setLabel('Comprar')
+        .setStyle(ButtonStyle.Success)
+        .setEmoji('🛒')
+    )
+  );
+
+  return container;
+}
+
 // Atualiza a mensagem V2 (flag obrigatoria, pois embeds/content nao funcionam em V2).
 async function updateV2(interaction, container) {
   await interaction.update({ components: [container], flags: V2_FLAGS });
 }
 
-module.exports = { V2_FLAGS, v2Section, v2Container, updateV2 };
+module.exports = { V2_FLAGS, v2Section, v2Container, montarContainerProduto, updateV2 };
