@@ -1,11 +1,11 @@
 // src/handlers/scheduler.js
 // Verifica a cada minuto se algum horario configurado bate com o horario atual,
-// e se sim, reenvia os cards de produto (individuais) nos canais configurados.
+// e se sim, sincroniza os cards de produto nos canais de envio
+// (edita os cards existentes em vez de duplicar).
 
 const cron = require('node-cron');
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { loadStore } = require('../storage');
-const { productCardEmbed } = require('../utils/embeds');
+const { publicarCards } = require('./publicar');
 
 function iniciarAgendador(client) {
   // Roda a cada minuto
@@ -20,26 +20,12 @@ function iniciarAgendador(client) {
 
       if (!horarios.includes(horaAtual) || canais.length === 0) continue;
 
-      const produtosDisponiveis = store.sales.products.filter(p => p.stock > 0);
-      if (produtosDisponiveis.length === 0) continue;
-
-      for (const canalId of canais) {
-        const canal = await guild.channels.fetch(canalId).catch(() => null);
-        if (!canal) continue;
-
-        for (const produto of produtosDisponiveis) {
-          const embed = productCardEmbed(store, produto);
-          const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-              .setCustomId(`publico:comprar_produto:${produto.id}`)
-              .setLabel('Comprar')
-              .setStyle(ButtonStyle.Success)
-              .setEmoji('🛒')
-          );
-          await canal.send({ embeds: [embed], components: [row] }).catch(err => {
-            console.error(`Erro ao reenviar embed em ${canal.id}:`, err.message);
-          });
-        }
+      const res = await publicarCards(guild).catch(err => {
+        console.error(`Erro ao sincronizar cards em ${guild.id}:`, err.message);
+        return null;
+      });
+      if (res) {
+        console.log(`[scheduler] Cards sincronizados em ${guild.name}: ${res.enviados} novos, ${res.editados} editados, ${res.removidos} removidos.`);
       }
     }
   });

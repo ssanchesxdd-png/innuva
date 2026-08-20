@@ -20,6 +20,7 @@ const {
 const { loadStore, saveStore, generateId } = require('../storage');
 const { productCardEmbed, ticketPanelEmbed } = require('../utils/embeds');
 const { v2Container, updateV2 } = require('../utils/v2');
+const { publicarCards } = require('./publicar');
 const { abrirTicket, confirmarVenda, processarConfirmacaoVenda, pagarComSaldo, pagarComPix, cancelarSessao, fecharTicket } = require('./tickets');
 const { pagamentoAprovado, cancelarPendente, handleReferencia, handleComprarTambem } = require('./sales');
 
@@ -142,7 +143,16 @@ async function mostrarMenuVendas(interaction) {
     title: '💰 Configurações de Vendas',
     description: 'Escolha o que deseja configurar.',
     rows: [new ActionRowBuilder().addComponents(menu)],
-    sections: [secaoVoltar('root')]
+    sections: [
+      {
+        label: '📤 Publicar/atualizar os cards de produto nos canais de envio',
+        accessory: new ButtonBuilder()
+          .setCustomId('config:publicar')
+          .setLabel('Publicar')
+          .setStyle(ButtonStyle.Primary)
+      },
+      secaoVoltar('root')
+    ]
   });
 
   await updateV2(interaction, container);
@@ -518,9 +528,10 @@ async function handleChannelSelectMenu(interaction) {
     const canais = interaction.values;
     store.sales.sendChannelIds = canais;
     saveStore(interaction.guildId, store);
+    await publicarCards(interaction.guild).catch(() => {});
     const container = v2Container(store, {
       title: '✅ Canais de envio configurados',
-      description: `Canais: ${canais.map(c => `<#${c}>`).join(', ')}.`,
+      description: `Canais: ${canais.map(c => `<#${c}>`).join(', ')}. Os cards de produto já foram sincronizados.`,
       sections: [secaoVoltar('vendas')]
     });
     return updateV2(interaction, container);
@@ -582,6 +593,20 @@ async function handleButton(interaction) {
   if (id === 'config:abrir_imagens') return mostrarMenuImagens(interaction, store);
   if (id === 'config:abrir_infos') return abrirModalPersonalizacao(interaction, store);
 
+  // ---- Config: publicar/atualizar os cards de produto nos canais ----
+  if (id === 'config:publicar') {
+    const res = await publicarCards(interaction.guild);
+    const container = v2Container(store, {
+      title: '📤 Embeds publicadas!',
+      description:
+        res === null
+          ? '⚠️ Nenhum canal de envio configurado. Configure em **Vendas → Canais de Envio das Embeds** primeiro.'
+          : `✅ **${res.enviados}** card(s) novo(s) enviado(s) · **${res.editados}** atualizado(s) · **${res.removidos}** removido(s).\n\nOs clientes podem clicar em 🛒 **Comprar** direto no canal, sem digitar comando.`,
+      sections: [secaoVoltar('vendas')]
+    });
+    return updateV2(interaction, container);
+  }
+
   // ---- Config: escolha de cor (clique em um dos botões de cor) ----
   if (id.startsWith('config:cor:')) {
     const hex = id.split(':')[2];
@@ -607,6 +632,7 @@ async function handleButton(interaction) {
       description: `${cor.emoji} **${cor.nome}** (${cor.hex}) aplicada em todas as embeds do bot.`,
       sections: [secaoVoltar('personalizacao')]
     });
+    await publicarCards(interaction.guild).catch(() => {});
     return updateV2(interaction, container);
   }
 
@@ -627,9 +653,10 @@ async function handleButton(interaction) {
     const removeu = store.sales.products.length < antes;
     const container = v2Container(store, {
       title: removeu ? '🗑️ Produto removido' : '⚠️ Produto não encontrado',
-      description: removeu ? 'O produto foi removido com sucesso.' : 'O produto já pode ter sido removido.',
+      description: removeu ? 'O produto foi removido com sucesso. O card dele foi removido dos canais de venda.' : 'O produto já pode ter sido removido.',
       sections: [secaoVoltar('vendas')]
     });
+    await publicarCards(interaction.guild).catch(() => {});
     return updateV2(interaction, container);
   }
 }
@@ -848,6 +875,11 @@ async function handleModalSubmit(interaction) {
       }
     }
 
+    // Se a categoria for product, atualiza os cards publicados
+    if (cat.id === 'product') {
+      await publicarCards(interaction.guild).catch(() => {});
+    }
+
     return interaction.reply({
       content: url ? `✅ Imagem de **${cat.nome}** definida.` : `🗑️ Imagem de **${cat.nome}** removida.`,
       ephemeral: true
@@ -887,8 +919,10 @@ async function handleModalSubmit(interaction) {
     });
     saveStore(interaction.guildId, store);
 
+    await publicarCards(interaction.guild).catch(() => {});
+
     return interaction.reply({
-      content: `✅ Produto "${nome}" adicionado (${jogo}) — R$ ${preco.toFixed(2)}, estoque: ${estoque}.`,
+      content: `✅ Produto "${nome}" adicionado (${jogo}) — R$ ${preco.toFixed(2)}, estoque: ${estoque}. Os cards foram atualizados nos canais de venda.`,
       ephemeral: true
     });
   }
@@ -905,7 +939,8 @@ async function handleModalSubmit(interaction) {
     produto.imageUrl = interaction.fields.getTextInputValue('imagemUrl')?.trim() || null;
 
     saveStore(interaction.guildId, store);
-    return interaction.reply({ content: `✅ Produto "${produto.name}" atualizado.`, ephemeral: true });
+    await publicarCards(interaction.guild).catch(() => {});
+    return interaction.reply({ content: `✅ Produto "${produto.name}" atualizado. Os cards foram atualizados nos canais de venda.`, ephemeral: true });
   }
 
   if (id.startsWith('modal:definir_preco:')) {
@@ -915,7 +950,8 @@ async function handleModalSubmit(interaction) {
     if (produto) {
       produto.price = preco;
       saveStore(interaction.guildId, store);
-      return interaction.reply({ content: `✅ Preço de "${produto.name}" atualizado para R$ ${preco.toFixed(2)}.`, ephemeral: true });
+      await publicarCards(interaction.guild).catch(() => {});
+      return interaction.reply({ content: `✅ Preço de "${produto.name}" atualizado para R$ ${preco.toFixed(2)}. Os cards foram atualizados nos canais de venda.`, ephemeral: true });
     }
     return interaction.reply({ content: 'Produto não encontrado.', ephemeral: true });
   }
@@ -927,7 +963,8 @@ async function handleModalSubmit(interaction) {
     if (produto) {
       produto.stock = estoque;
       saveStore(interaction.guildId, store);
-      return interaction.reply({ content: `✅ Estoque de "${produto.name}" atualizado para ${estoque}.`, ephemeral: true });
+      await publicarCards(interaction.guild).catch(() => {});
+      return interaction.reply({ content: `✅ Estoque de "${produto.name}" atualizado para ${estoque}. Os cards foram atualizados nos canais de venda.`, ephemeral: true });
     }
     return interaction.reply({ content: 'Produto não encontrado.', ephemeral: true });
   }

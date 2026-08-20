@@ -12,6 +12,7 @@ const {
 const { loadStore, saveStore, generatePurchaseId } = require('../storage');
 const { publicSaleEmbed, referenciaEmbed, pendingCardEmbed, privateLogEmbed } = require('../utils/embeds');
 const { registrarUso } = require('./coupons');
+const { publicarCards } = require('./publicar');
 
 // Cria a venda pendente (aguardando pagamento via Pix)
 async function registrarPendente(interaction, store, sessao) {
@@ -138,6 +139,9 @@ async function pagamentoAprovado(interaction, pendingId) {
 
   store.sales.history.push(compra);
   saveStore(interaction.guildId, store);
+
+  // Atualiza o card do produto nos canais de venda (estoque caiu)
+  await publicarCards(interaction.guild).catch(() => {});
 
   await finalizarCompra(interaction, store, compra);
 }
