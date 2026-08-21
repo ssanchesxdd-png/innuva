@@ -1,0 +1,40 @@
+# Configuracao do Fly.io para o bot Innova Forn
+# Ajuste o "app" para o nome unico que voce escolher (ex: innova-forn-<seunome>)
+
+app = "innuva"
+
+primary_region = "gru"
+
+[build]
+
+[env]
+  NODE_ENV = "production"
+  DATA_DIR = "/data"
+
+[experimental]
+  auto_rollback = true
+
+[[services]]
+  internal_port = 3000
+  processes = ["app"]
+  protocol = "tcp"
+
+  [services.concurrency]
+    hard_limit = 25
+    soft_limit = 20
+    type = "connections"
+
+  [[services.ports]]
+    handlers = ["http"]
+    port = 80
+
+  [[services.tcp_checks]]
+    grace_period = "10s"
+    interval = "15s"
+    restart_limit = 0
+    timeout = "2s"
+
+# Volume persistente para os dados da loja (data/<guildId>.json)
+[[mounts]]
+  source = "innova_data"
+  destination = "/data"

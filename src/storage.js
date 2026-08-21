@@ -1,11 +1,13 @@
 // src/storage.js
 // Responsavel por salvar e carregar os dados da loja em arquivos JSON.
 // Cada servidor (guild) tem seu proprio arquivo em /data/<guildId>.json
+// O caminho pode ser sobrescrito via env DATA_DIR (usado no Fly.io para
+// apontar para o volume persistente montado em /data).
 
 const fs = require('fs');
 const path = require('path');
 
-const DATA_DIR = path.join(__dirname, '..', 'data');
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });

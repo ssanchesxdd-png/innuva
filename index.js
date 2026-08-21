@@ -5,7 +5,7 @@ require('dotenv').config();
 const { Client, GatewayIntentBits, Collection } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
-const { handleInteraction } = require('./src/handlers/interactions');
+const { handleInteraction, handleMessage } = require('./src/handlers/interactions');
 const { iniciarAgendador } = require('./src/handlers/scheduler');
 const { verificarPendenciasExpiradas } = require('./src/handlers/sales');
 
@@ -33,6 +33,10 @@ client.once('clientReady', async () => {
 
 client.on('interactionCreate', (interaction) => {
   handleInteraction(interaction);
+});
+
+client.on('messageCreate', (message) => {
+  handleMessage(message);
 });
 
 // Evita que erros inesperados derrubem o bot inteiro

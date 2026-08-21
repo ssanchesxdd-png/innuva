@@ -20,8 +20,9 @@ const {
 
 const { loadStore, saveStore, generateId } = require('../storage');
 const { productCardEmbed, ticketPanelEmbed } = require('../utils/embeds');
-const { v2Container, updateV2, montarContainerProduto } = require('../utils/v2');
+const { v2Container, updateV2 } = require('../utils/v2');
 const { publicarCards } = require('./publicar');
+const { waitForAttachment, cancelPending } = require('../utils/attachmentCollector');
 const { abrirTicket, confirmarVenda, processarConfirmacaoVenda, pagarComSaldo, pagarComPix, cancelarSessao, fecharTicket } = require('./tickets');
 const { pagamentoAprovado, cancelarPendente, handleReferencia, handleComprarTambem } = require('./sales');
 
@@ -655,12 +656,25 @@ async function handleButton(interaction) {
   }
 
   // ---- Config: imagens por categoria ----
-  if (id.startsWith('config:imagem:')) {
+if (id.startsWith('config:imagem:')) {
     const categoria = id.split(':')[2];
     const cat = CATEGORIAS_IMAGEM.find(c => c.id === categoria);
     if (!cat) return interaction.update({ content: 'Categoria não encontrada.', embeds: [], components: [] });
+    
+    return solicitarUploadImagem(interaction, cat);
+  }
 
-    return abrirModalImagem(interaction, cat);
+  if (id.startsWith('config:cancelar_upload:')) {
+    const catId = id.split(':')[2];
+    const cat = CATEGORIAS_IMAGEM.find(c => c.id === catId);
+    cancelPending(interaction.user.id, interaction.channel.id);
+    
+    const container = v2Container(store, {
+      title: '❌ Upload cancelado',
+      description: 'Operação cancelada.',
+      sections: [secaoVoltar('personalizacao')]
+    });
+    return updateV2(interaction, container);
   }
 
   if (id.startsWith('config:confirmar_remocao:')) {
@@ -705,20 +719,65 @@ async function abrirModalPersonalizacao(interaction, store) {
   await interaction.showModal(modal);
 }
 
-async function abrirModalImagem(interaction, cat) {
+// Upload de imagem via anexo no chat (substitui o modal de URL)
+async function solicitarUploadImagem(interaction, cat) {
   const store = loadStore(interaction.guildId);
-  const modal = new ModalBuilder().setCustomId(`modal:imagem:${cat.id}`).setTitle(`🖼️ Imagem — ${cat.nome}`);
-
-  const urlInput = new TextInputBuilder()
-    .setCustomId('url')
-    .setLabel('URL da imagem (banner)')
-    .setStyle(TextInputStyle.Short)
-    .setPlaceholder('https://i.imgur.com/... (deixe vazio para limpar)')
-    .setValue(store.images?.[cat.id] || '')
-    .setRequired(false);
-
-  modal.addComponents(new ActionRowBuilder().addComponents(urlInput));
-  await interaction.showModal(modal);
+  const atual = store.images?.[cat.id] ? `\nAtual: ${store.images[cat.id]}` : '';
+  
+  const container = v2Container(store, {
+    title: `🖼️ Upload — ${cat.nome}`,
+    description:
+      `Envie a imagem no chat (anexo) para definir como **${cat.nome}**.${atual}\n\n` +
+      `*Tem 2 minutos para enviar. Cancele enviando "cancelar".*`,
+    sections: [{
+      label: 'Cancelar',
+      accessory: new ButtonBuilder()
+        .setCustomId(`config:cancelar_upload:${cat.id}`)
+        .setLabel('Cancelar')
+        .setStyle(ButtonStyle.Secondary)
+    }]
+  });
+  
+  await updateV2(interaction, container);
+  
+  // Aguarda o anexo
+  try {
+    const attachment = await waitForAttachment(interaction, { catId: cat.id });
+    
+    const store = loadStore(interaction.guildId);
+    if (!store.images) store.images = { product: null, ticket: null, logs: null };
+    store.images[cat.id] = attachment.url;
+    saveStore(interaction.guildId, store);
+    
+    // Atualiza painel de ticket se for categoria ticket
+    if (cat.id === 'ticket' && store.panelMessageId && store.ticket.panelChannelId) {
+      try {
+        const canal = await interaction.guild.channels.fetch(store.ticket.panelChannelId);
+        const msg = await canal.messages.fetch(store.panelMessageId);
+        await msg.edit({ embeds: [ticketPanelEmbed(store)] });
+      } catch (err) { /* ignora */ }
+    }
+    
+    // Atualiza cards se for categoria product
+    if (cat.id === 'product') {
+      await publicarCards(interaction.guild).catch(() => {});
+    }
+    
+    const containerSucesso = v2Container(store, {
+      title: '✅ Imagem definida!',
+      description: `Imagem de **${cat.nome}** atualizada com sucesso.`,
+      sections: [secaoVoltar('personalizacao')]
+    });
+    return interaction.followUp({ components: [containerSucesso], flags: MessageFlags.Ephemeral });
+    
+  } catch (err) {
+    const containerErro = v2Container(store, {
+      title: '⏱️ Tempo esgotado',
+      description: 'Nenhuma imagem foi enviada a tempo. Tente novamente.',
+      sections: [secaoVoltar('personalizacao')]
+    });
+    return interaction.followUp({ components: [containerErro], flags: MessageFlags.Ephemeral });
+  }
 }
 
 async function abrirModalHorarios(interaction, store) {
@@ -924,39 +983,6 @@ async function handleModalSubmit(interaction) {
     }
 
     return interaction.reply({ content: '✅ Personalização atualizada com sucesso.', flags: MessageFlags.Ephemeral });
-  }
-
-  // Imagem por categoria
-  if (id.startsWith('modal:imagem:')) {
-    const categoria = id.split(':')[2];
-    const cat = CATEGORIAS_IMAGEM.find(c => c.id === categoria);
-    if (!cat) return interaction.reply({ content: 'Categoria não encontrada.', flags: MessageFlags.Ephemeral });
-
-    const url = interaction.fields.getTextInputValue('url')?.trim() || null;
-    if (!store.images) store.images = { product: null, ticket: null, logs: null };
-    store.images[cat.id] = url;
-    saveStore(interaction.guildId, store);
-
-    // Se a categoria for ticket, atualiza o painel publicado
-    if (cat.id === 'ticket' && store.panelMessageId && store.ticket.panelChannelId) {
-      try {
-        const canal = await interaction.guild.channels.fetch(store.ticket.panelChannelId);
-        const msg = await canal.messages.fetch(store.panelMessageId);
-        await msg.edit({ embeds: [ticketPanelEmbed(store)] });
-      } catch (err) {
-        // ignora
-      }
-    }
-
-    // Se a categoria for product, atualiza os cards publicados
-    if (cat.id === 'product') {
-      await publicarCards(interaction.guild).catch(() => {});
-    }
-
-    return interaction.reply({
-      content: url ? `✅ Imagem de **${cat.nome}** definida.` : `🗑️ Imagem de **${cat.nome}** removida.`,
-      flags: MessageFlags.Ephemeral
-    });
   }
 
   if (id === 'modal:horarios') {

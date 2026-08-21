@@ -14,6 +14,7 @@ const { loadStore, saveStore, generatePurchaseId } = require('../storage');
 const { publicSaleEmbed, referenciaEmbed, pendingCardEmbed, privateLogEmbed } = require('../utils/embeds');
 const { registrarUso } = require('./coupons');
 const { publicarCards } = require('./publicar');
+const { waitForAttachmentInThread } = require('../utils/attachmentCollector');
 
 // Cria a venda pendente (aguardando pagamento via Pix)
 async function registrarPendente(interaction, store, sessao) {
@@ -30,7 +31,6 @@ async function registrarPendente(interaction, store, sessao) {
     finalValue: sessao.finalValue,
     couponCode: sessao.couponCode || null,
     accountUsername: sessao.usuarioConta || null,
-    referenceImage: sessao.referenciaImagem || null,
     pixKey: store.pixKey || null,
     expiresAt: Date.now() + prazoMin * 60000
   };
@@ -121,6 +121,17 @@ async function pagamentoAprovado(interaction, pendingId) {
     produto.stock = Math.max(0, produto.stock - pending.quantity);
   }
 
+  // Aguarda a foto de referência (anexo no ticket)
+  let referenceImage = null;
+  try {
+    const thread = interaction.channel;
+    await thread.send({ content: '📸 **Envie a foto de referência da conta** (anexo da imagem).\n*Tem 3 minutos para enviar.*' });
+    const attachment = await waitForAttachmentInThread(thread, interaction.user.id);
+    referenceImage = attachment.url;
+  } catch (err) {
+    console.warn('Timeout ou erro ao aguardar foto de referência:', err.message);
+  }
+
   const compra = {
     id: pending.id,
     buyerId: pending.userId,
@@ -134,7 +145,7 @@ async function pagamentoAprovado(interaction, pendingId) {
     couponCode: pending.couponCode,
     paymentMethod: 'Pix',
     accountUsername: pending.accountUsername,
-    referenceImage: pending.referenceImage,
+    referenceImage,
     date: Date.now()
   };
 

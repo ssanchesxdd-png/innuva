@@ -17,6 +17,7 @@ const { loadStore, saveStore, generateId, getBalance, addBalance } = require('..
 const { privateLogEmbed, ticketPanelEmbed } = require('../utils/embeds');
 const { aplicarCupom, calcularDesconto, registrarUso } = require('./coupons');
 const { registrarPendente, finalizarCompra } = require('./sales');
+const { waitForAttachmentInThread } = require('../utils/attachmentCollector');
 
 // Guarda em memoria qual produto cada thread de ticket se refere
 const ticketProdutoMap = new Map();
@@ -130,19 +131,11 @@ async function confirmarVenda(interaction) {
     .setPlaceholder('Ex: BEMVINDO10')
     .setRequired(false);
 
-  const referenciaInput = new TextInputBuilder()
-    .setCustomId('referenciaImagem')
-    .setLabel('📸 Foto de referência (URL, opcional)')
-    .setStyle(TextInputStyle.Short)
-    .setPlaceholder('https://i.imgur.com/...')
-    .setRequired(false);
-
   modal.addComponents(
     new ActionRowBuilder().addComponents(produtoInput),
     new ActionRowBuilder().addComponents(quantidadeInput),
     new ActionRowBuilder().addComponents(usuarioContaInput),
-    new ActionRowBuilder().addComponents(cupomInput),
-    new ActionRowBuilder().addComponents(referenciaInput)
+    new ActionRowBuilder().addComponents(cupomInput)
   );
 
   await interaction.showModal(modal);
@@ -156,7 +149,6 @@ async function processarConfirmacaoVenda(interaction) {
   const quantidade = parseInt(interaction.fields.getTextInputValue('quantidade'), 10) || 1;
   const usuarioConta = interaction.fields.getTextInputValue('usuarioConta')?.trim() || null;
   const cupomCode = interaction.fields.getTextInputValue('cupom')?.trim() || null;
-  const referenciaImagem = interaction.fields.getTextInputValue('referenciaImagem')?.trim() || null;
 
   const produto = store.sales.products.find(p => p.name.toLowerCase() === produtoNome.toLowerCase());
 
@@ -204,8 +196,7 @@ async function processarConfirmacaoVenda(interaction) {
     discount,
     finalValue,
     couponCode: cupomCode,
-    usuarioConta,
-    referenciaImagem
+    usuarioConta
   });
 
   const saldo = getBalance(store, interaction.user.id);
@@ -296,6 +287,17 @@ async function pagarComSaldo(interaction, sessaoId) {
   }
   if (sessao.couponCode) registrarUso(store, sessao.couponCode);
 
+  // Aguarda a foto de referência (anexo no ticket)
+  let referenceImage = null;
+  try {
+    const thread = interaction.channel;
+    await thread.send({ content: '📸 **Envie a foto de referência da conta** (anexo da imagem).\n*Tem 3 minutos para enviar.*' });
+    const attachment = await waitForAttachmentInThread(thread, interaction.user.id);
+    referenceImage = attachment.url;
+  } catch (err) {
+    console.warn('Timeout ou erro ao aguardar foto de referência:', err.message);
+  }
+
   const compra = {
     id: generateId('compra_'),
     buyerId: sessao.userId || interaction.user.id,
@@ -309,7 +311,7 @@ async function pagarComSaldo(interaction, sessaoId) {
     couponCode: sessao.couponCode,
     paymentMethod: 'Saldo',
     accountUsername: sessao.usuarioConta,
-    referenceImage: sessao.referenciaImagem,
+    referenceImage,
     saldoUsado: usarSaldo,
     date: Date.now()
   };
