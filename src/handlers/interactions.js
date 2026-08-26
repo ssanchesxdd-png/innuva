@@ -1191,6 +1191,7 @@ async function handleModalSubmit(interaction) {
 
   if (id === 'modal:pix_key') {
     store.pixKey = interaction.fields.getTextInputValue('pixKey').trim();
+    store.pixQrUrl = null; // invalida o QR antigo: sera regerado na proxima cobranca
     saveStore(interaction.guildId, store);
     return interaction.reply({ content: `✅ Chave Pix configurada: \`${store.pixKey}\``, flags: MessageFlags.Ephemeral });
   }

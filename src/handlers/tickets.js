@@ -15,12 +15,54 @@ const {
   StringSelectMenuBuilder,
   ContainerBuilder,
   TextDisplayBuilder,
-  SeparatorBuilder
+  SeparatorBuilder,
+  MediaGalleryBuilder,
+  MediaGalleryItemBuilder,
+  AttachmentBuilder
 } = require('discord.js');
 const { loadStore, saveStore, generateId } = require('../storage');
 const { privateLogContainer } = require('../utils/embeds');
 const { aplicarCupom, calcularDesconto, registrarUso } = require('./coupons');
 const { criarPendencia, pagamentoAprovado } = require('./sales');
+const { gerarPayloadPix, gerarQrBuffer } = require('../utils/pix');
+
+// Garante que exista UMA imagem de QR Pix hospedada no Discord por loja
+// (enviada uma unica vez e guardada em store.pixQrUrl). Assim o estagio de
+// pagamento apenas referencia a URL remota nos re-renders sincronos.
+const PIX_QR_TENTATIVAS = new Map();
+
+async function garantirPixQr(guild, store) {
+  if (!store.pixKey || store.pixQrUrl) return;
+  const agora = Date.now();
+  if (agora - (PIX_QR_TENTATIVAS.get(guild.id) || 0) < 10 * 60 * 1000) return;
+  PIX_QR_TENTATIVAS.set(guild.id, agora);
+
+  try {
+    const payload = gerarPayloadPix({
+      chave: store.pixKey,
+      nome: store.storeName || 'Innova Forn',
+      cidade: process.env.PIX_CITY || 'SAO PAULO'
+    });
+    const buffer = await gerarQrBuffer(payload);
+    const anexo = new AttachmentBuilder(buffer, { name: `pix-${guild.id}.png` });
+
+    let host = store.logs.privateChannelId ? await guild.channels.fetch(store.logs.privateChannelId).catch(() => null) : null;
+    if (!host && store.ticket.panelChannelId) {
+      host = await guild.channels.fetch(store.ticket.panelChannelId).catch(() => null);
+    }
+    if (!host?.isTextBased()) return;
+
+    const assetMsg = await host.send({ content: '🧩 Asset interno (QR Pix da loja).', files: [anexo] });
+    const url = assetMsg.attachments.first()?.url;
+    if (url) {
+      store.pixQrUrl = url;
+      saveStore(guild.id, store);
+      console.log(`[pix] QR hospedado para ${guild.name}`);
+    }
+  } catch (err) {
+    console.error('[pix] falha ao hospedar QR:', err.message);
+  }
+}
 
 // Tipos de ticket disponíveis no seletor do painel
 const TIPOS_TICKET = {
@@ -347,6 +389,18 @@ function renderEstagio(store, registro) {
         (store.pixKey ? `🏦 **Chave Pix:**\n\`${store.pixKey}\`` : '⚠️ **Chave Pix não configurada!** Avise a staff.')
       )
     );
+
+    // QR Code do Pix (URL hospedada uma vez por loja — ver garantirPixQr)
+    if (store.pixKey && store.pixQrUrl) {
+      container.addSeparatorComponents(new SeparatorBuilder());
+      container.addMediaGalleryComponents(
+        new MediaGalleryBuilder().addItems(
+          new MediaGalleryItemBuilder()
+            .setMedia(store.pixQrUrl)
+            .setDescription('Escaneie o QR Code para pagar com Pix')
+        )
+      );
+    }
     container.addSeparatorComponents(new SeparatorBuilder());
     container.addActionRowComponents(
       new ActionRowBuilder().addComponents(
@@ -473,6 +527,7 @@ async function handleTicketButton(interaction) {
     }
     registro.stage = 'pagamento';
     saveStore(interaction.guildId, store);
+    await garantirPixQr(interaction.guild, store); // gera/hospeda o QR se ainda nao existir
     return interaction.update(renderEstagio(store, registro));
   }
 
