@@ -1,6 +1,8 @@
 # Sistema de Backup — Innova Forn Bot
 
-Duas camadas independentes de proteção: **código** (Git + Windows) e **dados da loja** (snapshots diários dentro do próprio bot).
+Duas camadas independentes de proteção: **código** (Git + Windows) e **dados da loja** (snapshots diários + envio na DM do dono).
+
+> ⚠️ **Fonte única da verdade:** este repositório (`C:\Users\sanches\Projects\innuva`). A pasta antiga `Documents\Default Project` foi a origem do código até 26/08/2026 e deve ser tratada como arquivo histórico — não editar mais lá.
 
 ---
 
@@ -8,69 +10,54 @@ Duas camadas independentes de proteção: **código** (Git + Windows) e **dados 
 
 ### O que roda todo dia (06:00, tarefa agendada no Windows: `InnuvaBackupDiario`)
 O script `scripts/backup-diario.ps1` faz:
-1. **Commita e empurra** qualquer mudança pendente para o GitHub (`main`) — o repositório é o backup principal do código
+1. **Commita e empurra** qualquer mudança pendente para o GitHub (`main`) — o repositório é o backup principal
 2. Gera **ZIP local** em `%USERPROFILE%\Backups\innuva-codigo\` (sem `.git`/`node_modules`)
 3. **Retenção de 30 dias**: apaga zips antigos automaticamente
-4. Salva o log (`backup-log.txt`) e o hash do último commit estável (`ultimo-commit-estavel.txt`)
+4. Salva log (`backup-log.txt`) e hash do último commit estável (`ultimo-commit-estavel.txt`)
 
 ### Como restaurar o código
 ```powershell
-# Ver onde está o último estado bom
 Get-Content "$env:USERPROFILE\Backups\innuva-codigo\ultimo-commit-estavel.txt"
-
 cd C:\Users\sanches\Projects\innuva
-git checkout <hash>   # ou: git reset --hard <hash>
-git push origin main --force-with-lease   # só se precisar sobrescrever a main
+git checkout <hash>    # ou git reset --hard <hash>
 ```
-Ou extrair um zip qualquer: `Expand-Archive innuva-codigo-20260826-0600.zip .`
 
----
+## 2. Backup dos DADOS DA LOJA (produtos, cupons, FAQ, receipts, config)
 
-## 2. Backup dos DADOS DA LOJA (produtos, saldos, cupons, histórico, config)
+Dados em `/data/<guildId>.json` no volume persistente da Fly.io (**região iad**, volume `innova_data`).
 
-Os dados vivem no volume persistente do Fly.io (`/data/<guildId>.json`). O sistema gera snapshots em `/data/backups/<guildId>/`, **retidos por 30 dias**, sem depender do Discord para existir.
-
-### Automático
-Todo dia às **03:00 (fuso America/Sao_Paulo)** o scheduler copia os dados de cada servidor. Logs no console do Fly:
-```
-[backup] Rotina diaria iniciada.
-[backup] <servidor>: backup-2026-08-26-0300-diario.json (4.7 KB, 12 no historico)
-```
+### Backup diário às 03:00 (America/Sao_Paulo) faz DUAS coisas:
+1. **Snapshot persistente** em `/data/backups/<guildId>/` (retido por 30 dias)
+2. **Envia o `.json` na DM do dono do servidor** (fallback: canal de logs privado)
 
 ### Comandos (staff)
 | Comando | Função |
 |---|---|
-| `/backup criar` | Snapshot imediato dos dados atuais |
-| `/backup listar` | Lista snapshots salvos com tamanho e data |
-| `/backup enviar [arquivo]` | Baixa um snapshot como `.json` (guarde fora do servidor!) |
-| `/restaurar snapshot arquivo:<nome> confirmar:Sim` | Volta o estado de um snapshot salvo |
-| `/restaurar arquivo dados:<.json> confirmar:Sim` | Restaura a partir de um `.json` enviado no chat |
+| `/backup criar` | Snapshot imediato |
+| `/backup listar` | Lista snapshots com data/tamanho |
+| `/backup enviar [arquivo]` | Baixa um snapshot como `.json` |
+| `/restaurar snapshot arquivo:<nome> confirmar:Sim` | Restaura snapshot salvo |
+| `/restaurar arquivo dados:<.json> confirmar:Sim` | Restaura de um `.json` enviado no chat |
 
 ### Segurança embutida no restore
-- Antes de sobrescrever, o bot salva automaticamente um snapshot **prerestauração** — então até uma restauração errada é reversível
-- Validação estrutural do JSON antes de aplicar
-- Os cards nos canais de venda são **re-sincronizados** após restaurar
-- Tudo logado no canal de logs privado, se configurado
+- Sempre salva um snapshot **prerestauração** antes de sobrescrever (erro vira reversível)
+- Validação estrutural do JSON; cards re-sincronizados após restaurar; tudo logado
 
-### Cenários cobertos
-| Problema | Solução |
-|---|---|
-| Alguém apaga produto/cupom por engano | `/restaurar snapshot` de ontem |
-| Arquivo JSON corrompido | A rotina diária já guardou cópia boa |
-| Volume/máquina da Fly.io perdidos | Restore com `/restaurar arquivo` usando um `.json` baixado previamente |
-| Código quebrado num deploy novo | `flyctl releases rollback` + rollback do Git (camada 1) |
+## 3. Deploy
 
-### Dica de rotina
-Uma vez por semana rode `/backup enviar` e guarde o arquivo (pasta pessoal ou canal privado). É sua proteção se o volume inteiro sumir de uma vez.
-
----
-
-## Manutenção do agendamento (Windows)
 ```powershell
-schtasks /Query /TN InnuvaBackupDiario          # ver status
-schtasks /Run /TN InnuvaBackupDiario            # rodar agora
-schtasks /Change /TN InnuvaBackupDiario /ST 07:00   # trocar horário
+flyctl deploy -a innuva          # direto
+.\scripts\deploy-fly.ps1         # preserva dados: baixa JSON -> deploy -> restaura -> reinicia
+```
+O `deploy-fly.ps1` (resgatado da pasta antiga) também remove machines duplicadas. Nota: com snapshots automáticos em `/data/backups/`, o passo manual dele virou redundância saudável — pode usar qualquer um dos dois.
+
+Releases anteriores ficam guardadas na Fly.io:
+```powershell
+flyctl releases -a innuva --image        # lista versões
+flyctl releases rollback -a innuva       # volta para a anterior
 ```
 
-## Register manual de comandos (raramente necessário)
-O bot agora **auto-registra** os slash commands na inicialização usando os segredos `CLIENT_ID`/`GUILD_ID`. Se precisar forçar: `npm run register`.
+### Regras de ouro aprendidas em 26/08/2026
+1. **Nunca deployar por cima sem confirmar que o GitHub = código em produção** — o desalinhamento entre pasta local não-versionada e repo causou perda aparente das funções novas (resolvido)
+2. Estado em memória do bot (`sessaoVendaMap`, tickets abertos) sobrevive ao restore pois `store.ticket.open` persiste no JSON
+3. O `generateId()` dos IDs usa timestamp — restores nunca colidem com dados novos
