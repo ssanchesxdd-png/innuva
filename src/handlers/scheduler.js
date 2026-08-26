@@ -11,11 +11,30 @@ const { AttachmentBuilder } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 
+// Fuso usado para comparar os horarios de envio configurados na loja.
+// O container da Fly.io roda em UTC: usar new Date().getHours() faria os
+// cards sairem 3h adiantados. Alteravel via env BOT_TZ se necessario.
+const FUSO_HORARIO = process.env.BOT_TZ || 'America/Sao_Paulo';
+
+// Hora atual "HH:MM" no fuso da loja. hourCycle h23 evita o "24:xx"
+// que o Intl pode devolver a meia-noite em alguns ambientes.
+function horaAtualNoFuso(date = new Date()) {
+  const fmt = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: FUSO_HORARIO,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23'
+  });
+  const partes = {};
+  for (const p of fmt.formatToParts(date)) partes[p.type] = p.value;
+  const hh = partes.hour === '24' ? '00' : partes.hour;
+  return `${hh}:${partes.minute}`;
+}
+
 function iniciarAgendador(client) {
   // Roda a cada minuto
   cron.schedule('* * * * *', async () => {
-    const agora = new Date();
-    const horaAtual = `${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}`;
+    const horaAtual = horaAtualNoFuso();
 
     for (const guild of client.guilds.cache.values()) {
       const store = loadStore(guild.id);
@@ -80,4 +99,4 @@ function iniciarAgendador(client) {
   console.log('Agendador de reenvio diário iniciado.');
 }
 
-module.exports = { iniciarAgendador };
+module.exports = { iniciarAgendador, horaAtualNoFuso };
