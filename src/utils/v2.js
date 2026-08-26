@@ -74,10 +74,25 @@ function montarContainerProduto(store, produto, { titulo, info, divAcima, divAba
 
   return container;
 }
+// Container simples de informacao (substitui embeds titulo+descricao)
+function v2Info(store, { title, description, color, rows = [] }) {
+  const container = new ContainerBuilder()
+    .setAccentColor(parseInt((color || store.color || '#5865F2').replace('#', ''), 16))
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(`**${title}**\n\n${description}`)
+    );
+
+  if (rows.length > 0) {
+    container.addSeparatorComponents(new SeparatorBuilder());
+    for (const row of rows) container.addActionRowComponents(row);
+  }
+
+  return container;
+}
 
 // Atualiza a mensagem V2 (flag obrigatoria, pois embeds/content nao funcionam em V2).
 async function updateV2(interaction, container) {
   await interaction.update({ components: [container], flags: V2_FLAGS });
 }
 
-module.exports = { V2_FLAGS, v2Section, v2Container, montarContainerProduto, updateV2 };
+module.exports = { V2_FLAGS, v2Section, v2Container, v2Info, montarContainerProduto, updateV2 };

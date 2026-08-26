@@ -3,7 +3,7 @@
 
 app = "innuva"
 
-primary_region = "gru"
+primary_region = "iad"
 
 [build]
 
@@ -34,7 +34,7 @@ primary_region = "gru"
     restart_limit = 0
     timeout = "2s"
 
-# Volume persistente para os dados da loja (data/<guildId>.json)
+# Volume persistente para os dados da loja
 [[mounts]]
   source = "innova_data"
   destination = "/data"

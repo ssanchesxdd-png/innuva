@@ -4,13 +4,12 @@
 const {
   SlashCommandBuilder,
   PermissionFlagsBits,
-  EmbedBuilder,
   ActionRowBuilder,
   StringSelectMenuBuilder,
   MessageFlags
 } = require('discord.js');
-const { loadStore, saveStore, generateId } = require('../storage');
-const { couponListEmbed } = require('../utils/embeds');
+const { v2Info } = require('../utils/v2');
+const { couponListContainer } = require('../utils/embeds');
 const { criarCupom, deletarCupom, listarCupons } = require('../handlers/coupons');
 
 function isStaff(member) {
@@ -89,24 +88,21 @@ module.exports = {
       const c = resultado.cupom;
       const desconto = c.type === 'percent' ? `${c.value}%` : `R$ ${c.value.toFixed(2)}`;
 
-      const embed = new EmbedBuilder()
-        .setTitle('🎟️ Cupom criado com sucesso!')
-        .setDescription(
+      const container = v2Info(store, {
+        title: '🎟️ Cupom criado com sucesso!',
+        description:
           `**Código:** \`${c.code}\`\n` +
           `**Desconto:** ${desconto}\n` +
           `**Usos:** ${c.uses} / ${c.maxUses > 0 ? c.maxUses : '∞'}\n` +
           (c.expiresAt ? `**Expira:** ${new Date(c.expiresAt).toLocaleDateString('pt-BR')}` : '**Expira:** nunca')
-        )
-        .setColor('#5865F2')
-        .setFooter({ text: store.storeName, iconURL: store.logoUrl || undefined })
-        .setTimestamp();
+      });
 
-      return interaction.reply({ embeds: [embed] });
+      return interaction.reply({ components: [container], flags: [MessageFlags.IsComponentsV2] });
     }
 
     if (sub === 'listar') {
-      const embed = couponListEmbed(store);
-      return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+      const listaContainer = couponListContainer(store);
+      return interaction.reply({ components: [listaContainer], flags: MessageFlags.Ephemeral | MessageFlags.IsComponentsV2 });
     }
 
     if (sub === 'deletar') {

@@ -34,7 +34,8 @@ async function publicarCards(guild) {
   });
 
   for (const canalId of canais) {
-    const canal = await guild.channels.fetch(canalId).catch(() => null);
+    const canal = await guild.channels.fetch(canalId).catch(err => { console.log('[publicar] canal ' + canalId + ' FALHOU: ' + (err.code || err.message)); return null; });
+    console.log('[publicar] canal ' + canalId + ' ok (' + canal.name + ')');
     if (!canal) continue;
 
     for (const produto of produtos) {
@@ -49,13 +50,13 @@ async function publicarCards(guild) {
           continue;
         }
         // Card apagado manualmente no canal: envia de novo
-        const nova = await canal.send({ components: [container], flags: V2_FLAGS }).catch(() => null);
+        const nova = await canal.send({ components: [container], flags: V2_FLAGS }).catch(err => { console.log('[publicar] falha ao enviar: ' + (err.code || '') + ' ' + (err.message || '')); return null; });
         if (nova) {
           reg.messageId = nova.id;
           enviados++;
         }
       } else {
-        const msg = await canal.send({ components: [container], flags: V2_FLAGS }).catch(() => null);
+        const msg = await canal.send({ components: [container], flags: V2_FLAGS }).catch(err => { console.log('[publicar] falha ao enviar: ' + (err.code || '') + ' ' + (err.message || '')); return null; });
         if (msg) {
           registros.push({ productId: produto.id, channelId: canalId, messageId: msg.id });
           enviados++;

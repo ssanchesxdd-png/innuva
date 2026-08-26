@@ -2,10 +2,11 @@
 // Ponto de entrada do bot: cria o client, carrega os comandos e inicia o agendador.
 
 require('dotenv').config();
-const { Client, GatewayIntentBits, Collection } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, ActivityType } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 const { handleInteraction, handleMessage } = require('./src/handlers/interactions');
+const { ticketMessageHook } = require('./src/handlers/tickets');
 const { iniciarAgendador } = require('./src/handlers/scheduler');
 const { verificarPendenciasExpiradas } = require('./src/handlers/sales');
 
@@ -27,12 +28,23 @@ for (const file of fs.readdirSync(commandsDir).filter(f => f.endsWith('.js'))) {
 
 client.once('clientReady', async () => {
   console.log(`✅ Bot online como ${client.user.tag}`);
+
+  // Status "Transmitindo"
+  client.user.setPresence({
+    activities: [{
+      name: 'a melhor loja de roblox br',
+      type: ActivityType.Streaming,
+      url: 'https://www.twitch.tv/roblox'
+    }],
+    status: 'online'
+  });
+
   iniciarAgendador(client);
   setInterval(() => verificarPendenciasExpiradas(client), 60000);
 
   // Auto-registro dos comandos de barra no servidor (efeito imediato).
-  // Usa os segredos CLIENT_ID/GUILD_ID configurados no Fly.io; se estiverem
-  // ausentes, mantem o registro manual via node deploy-commands.js
+  // Usa CLIENT_ID/GUILD_ID do ambiente (secrets no Fly.io); se ausentes,
+  // mantem o registro manual via npm run register.
   try {
     const clientId = process.env.CLIENT_ID;
     const guildId = process.env.GUILD_ID;
@@ -43,7 +55,7 @@ client.once('clientReady', async () => {
       await rest.put(Routes.applicationGuildCommands(clientId, guildId), { body });
       console.log(`🛠️ ${body.length} comandos registrados no servidor (${guildId}).`);
     } else {
-      console.warn('⚠️ CLIENT_ID/GUILD_ID ausentes: registro automatico de comandos pulado.');
+      console.warn('⚠️ CLIENT_ID/GUILD_ID ausentes: registro automatico pulado.');
     }
   } catch (err) {
     console.error('❌ Falha ao registrar comandos no boot:', err.message);
@@ -56,6 +68,7 @@ client.on('interactionCreate', (interaction) => {
 
 client.on('messageCreate', (message) => {
   handleMessage(message);
+  ticketMessageHook(message);
 });
 
 // Evita que erros inesperados derrubem o bot inteiro

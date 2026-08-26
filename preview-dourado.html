@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Preview — Painel Premium Dourado</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1e1f22;
+    font-family: 'gg sans', 'Segoe UI', Roboto, sans-serif;
+    padding: 40px 20px;
+    display: flex;
+    gap: 40px;
+    justify-content: center;
+    flex-wrap: wrap;
+    color: #dbdee1;
+  }
+  .coluna { width: 420px; }
+  .titulo-coluna {
+    text-align: center; color: #949ba4; font-size: 13px;
+    text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px;
+  }
+  /* ====== container V2 (fundo do canal) ====== */
+  .msg {
+    background: #2b2d31;
+    border-radius: 8px;
+    padding: 16px 16px 16px 0;
+    margin-bottom: 30px;
+  }
+  /* container V2 = caixa mais escura com barra de acento à esquerda */
+  .container {
+    background: #232428;
+    border: 1px solid #1e1f22;
+    border-left: 4px solid #FFD700;
+    border-radius: 8px;
+    padding: 16px;
+    margin-left: 16px;
+  }
+  .container.escuro { border-left-color: #E6B800; background: #1f2023; }
+  .nome-loja { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .coroa { font-size: 20px; }
+  .titulo { font-weight: 700; font-size: 16px; color: #FFD700; letter-spacing: 0.3px; }
+  .tag { font-size: 12px; color: #949ba4; margin-bottom: 12px; }
+  .sep { border-top: 1px solid #3f4147; margin: 12px 0; }
+  .opcao { padding: 6px 0; font-size: 15px; color: #dbdee1; display: flex; gap: 8px; }
+  .opcao b { color: #FFD700; }
+  .info { font-size: 14px; color: #b5bac1; line-height: 1.5; margin-top: 12px; }
+  .info b { color: #fff; }
+  .preco { color: #FFD700; font-weight: 700; }
+  /* ====== botões ====== */
+  .row { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .btn {
+    border: none; border-radius: 4px; padding: 8px 14px;
+    font-size: 13.5px; font-weight: 600; cursor: pointer;
+    background: #4e5058; color: #fff;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn:hover { background: #6d6f78; }
+  .btn.verde { background: #248046; }
+  .btn.verde:hover { background: #1a6334; }
+  .btn.cinza-escuro { background: #2b2d31; border: 1px solid #3f4147; }
+  .badge {
+    display: inline-block; background: #FFD700; color: #1e1f22;
+    font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 10px;
+    letter-spacing: 0.5px; vertical-align: middle; margin-left: 6px;
+  }
+  .esgotado { opacity: 0.55; font-size: 13px; color: #949ba4; margin-top: 6px; }
+</style>
+</head>
+<body>
+
+<!-- ================= VARIANTE 1: painel principal ================= -->
+<div class="coluna">
+  <div class="titulo-coluna">Variante 1 — Painel principal dourado</div>
+  <div class="msg">
+    <div class="container">
+      <div class="nome-loja">
+        <span class="coroa">👑</span>
+        <span class="titulo">INNOVA FORN</span>
+        <span class="badge">PREMIUM</span>
+      </div>
+      <div class="tag">A loja de contas mais rápida e segura do Discord.</div>
+      <div class="sep"></div>
+      <div class="opcao"><span>⭐</span><span><b>Comprar contas</b> — estoque disponível agora</span></div>
+      <div class="opcao"><span>❓</span><span><b>Dúvidas frequentes</b> — respostas na hora, sem esperar</span></div>
+      <div class="opcao"><span>💬</span><span><b>Falar com a staff</b> — atendimento personalizado</span></div>
+      <div class="sep"></div>
+      <div class="row">
+        <button class="btn verde">🛒 Comprar Agora</button>
+        <button class="btn">❓ FAQ</button>
+        <button class="btn">🎫 Suporte</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= VARIANTE 1b: card de produto ================= -->
+  <div class="titulo-coluna">Card de produto (dourado)</div>
+  <div class="msg">
+    <div class="container escuro">
+      <div class="nome-loja">
+        <span class="coroa">🎮</span>
+        <span class="titulo">ACC BLOX — FULL ACESS</span>
+      </div>
+      <div class="sep"></div>
+      <div class="info">
+        💰 <b>Valor à vista:</b> <span class="preco">R$ 25,00</span><br>
+        📦 <b>Restam:</b> 3 unidades
+      </div>
+      <div class="sep"></div>
+      <div class="row">
+        <button class="btn verde">🛒 Comprar</button>
+        <button class="btn">⭐ Detalhes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= VARIANTE 2: escuro premium ================= -->
+<div class="coluna">
+  <div class="titulo-coluna">Variante 2 — Escuro premium (dourado sutil)</div>
+  <div class="msg">
+    <div class="container escuro">
+      <div class="nome-loja">
+        <span class="coroa">👑</span>
+        <span class="titulo">INNOVA FORN</span>
+      </div>
+      <div class="tag">Compre sem sair do Discord — entrega em minutos.</div>
+      <div class="sep"></div>
+      <div class="info">
+        ⭐ <b>Contas verificadas</b> com garantia<br>
+        ⚡ Entrega imediata após confirmação<br>
+        🛡️ Suporte humano no próprio ticket
+      </div>
+      <div class="sep"></div>
+      <div class="row">
+        <button class="btn verde">🛒 Comprar Agora</button>
+        <button class="btn cinza-escuro">❓ Dúvidas Frequentes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= VARIANTE 2b: esgotado ================= -->
+  <div class="titulo-coluna">Card esgotado (com avisame)</div>
+  <div class="msg">
+    <div class="container escuro">
+      <div class="nome-loja">
+        <span class="coroa">🎮</span>
+        <span class="titulo">ACC PREMIUM — RARIDADE</span>
+      </div>
+      <div class="sep"></div>
+      <div class="info">💰 <b>Valor:</b> <span class="preco">R$ 60,00</span></div>
+      <div class="esgotado">🔴 Esgotado no momento</div>
+      <div class="sep"></div>
+      <div class="row">
+        <button class="btn">🔔 Avise-me quando chegar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

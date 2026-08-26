@@ -4,9 +4,12 @@
 // (edita os cards existentes em vez de duplicar).
 
 const cron = require('node-cron');
-const { loadStore } = require('../storage');
+const { loadStore, getDataDir } = require('../storage');
 const { publicarCards } = require('./publicar');
-const { fazerBackup, listarBackups } = require('./backups');
+const { fazerBackup } = require('./backups');
+const { AttachmentBuilder } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
 
 function iniciarAgendador(client) {
   // Roda a cada minuto
@@ -31,25 +34,47 @@ function iniciarAgendador(client) {
     }
   });
 
-  // Backup diario dos dados da loja: copia o JSON de cada servidor para
-  // /data/backups/<guildId>/ antes da limpeza automatica dos antigos.
+  // Backup diario da loja as 03:00 (horario de Sao Paulo):
+  // gera snapshot persistente em /data/backups/<guildId>/ e envia o JSON
+  // na DM do dono (fallback: canal de logs privado).
   cron.schedule('0 3 * * *', async () => {
     console.log('[backup] Rotina diaria iniciada.');
-    let feitos = 0;
     for (const guild of client.guilds.cache.values()) {
       try {
         const r = fazerBackup(guild.id, { motivo: 'diario' });
-        if (r.ok) {
-          feitos++;
-          console.log(`[backup] ${guild.name}: ${r.fileName} (${(r.sizeBytes / 1024).toFixed(1)} KB, ${listarBackups(guild.id).length} no historico)`);
-        } else if (r.error !== 'Essa loja ainda nao possui dados salvos.') {
-          console.warn(`[backup] ${guild.name}: ${r.error}`);
+        if (!r.ok) {
+          if (!/dados/i.test(r.error)) console.warn(`[backup] ${guild.name}: ${r.error}`);
+          continue;
         }
+
+        const dia = r.fileName.match(/^backup-(\d{4}-\d{2}-\d{2})-/)?.[1] || '';
+        const arquivo = path.join(getDataDir(), `${guild.id}.json`);
+        const attachment = new AttachmentBuilder(
+          fs.readFileSync(arquivo),
+          { name: `backup-innova-${dia}.json` }
+        );
+
+        let enviado = false;
+        const owner = await client.users.fetch(guild.ownerId).catch(() => null);
+        if (owner) {
+          enviado = await owner.send({
+            content: `💾 **Backup diário da loja** — ${dia}`,
+            files: [attachment]
+          }).then(() => true).catch(() => false);
+        }
+        if (!enviado) {
+          const store = loadStore(guild.id);
+          if (store.logs?.privateChannelId) {
+            const logChannel = await guild.channels.fetch(store.logs.privateChannelId).catch(() => null);
+            await logChannel?.send({ content: '💾 Backup diário da loja:', files: [attachment] }).catch(() => {});
+          }
+        }
+        console.log(`[backup] diario: ${r.fileName} para ${guild.name}${enviado ? ' (DM do dono)' : ' (canal de logs)'}`);
       } catch (err) {
-        console.error(`[backup] Falha em ${guild.name}:`, err.message);
+        console.error('[backup] erro:', err.message);
       }
     }
-    console.log(`[backup] Rotina diaria concluida (${feitos} servidores com dados).`);
+    console.log('[backup] Rotina diaria concluida.');
   }, { timezone: 'America/Sao_Paulo' });
 
   console.log('Agendador de reenvio diário iniciado.');
