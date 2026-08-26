@@ -26,6 +26,21 @@ function Log($msg) {
   Add-Content -Path $logFile -Value $linha
 }
 
+# Executa um comando nativo SEM deixar o PowerShell converter avisos de stderr
+# (ex.: "Everything up-to-date" do git push) em excecao com ErrorActionPreference=Stop.
+function Invoke-Tool([string]$FilePath, [string[]]$ToolArgs) {
+  $anterior = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  try {
+    $saida = & $FilePath @ToolArgs 2>&1
+    $codigo = $LASTEXITCODE
+    return @{ Code = $codigo; Output = (($saida | Out-String)).Trim() }
+  }
+  finally {
+    $ErrorActionPreference = $anterior
+  }
+}
+
 Log '=== Backup diario do codigo (innuva) ==='
 
 if (-not (Test-Path (Join-Path $RepoPath '.git'))) {
@@ -36,36 +51,39 @@ if (-not (Test-Path (Join-Path $RepoPath '.git'))) {
 Push-Location $RepoPath
 try {
   # ---- 1) GitHub: o proprio repositorio e o backup principal ----
-  $sujo = @(git status --porcelain)
-  if ($sujo.Count -gt 0) {
+  $status = Invoke-Tool 'git' @('status', '--porcelain')
+  $pendentes = @($status.Output | Where-Object { $_.Trim() })
+  if ($pendentes.Count -gt 0) {
     $mensagem = "backup diario automatico: $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
-    Log ("Commitando {0} arquivo(s) alterado(s)..." -f $sujo.Count)
-    git add -A | Out-Null
-    git commit -m $mensagem | Out-Null | Out-String | ForEach-Object { $_.Trim() } | Out-Null
+    Log ("Commitando {0} arquivo(s) alterado(s)..." -f $pendentes.Count)
+    $null = Invoke-Tool 'git' @('add', '-A')
+    $commit = Invoke-Tool 'git' @('commit', '-m', $mensagem)
+    if ($commit.Code -ne 0) { Log "AVISO: commit retornou $($commit.Code): $($commit.Output)" }
   } else {
     Log 'Nenhuma mudanca local desde o ultimo commit.'
   }
 
-  git push origin main *> $null
-  if ($LASTEXITCODE -eq 0) {
+  $push = Invoke-Tool 'git' @('push', 'origin', 'main')
+  if ($push.Code -eq 0) {
     Log 'Push para o GitHub OK (main sincronizada).'
   } else {
-    Log "AVISO: push falhou (exit code $LASTEXITCODE). Verificar credenciais do Git."
+    Log "AVISO: push falhou (exit $($push.Code)): $($push.Output)"
   }
 
   # Guarda o ponto exato de restauracao
-  $hash = (git rev-parse HEAD).Trim()
+  $rev = Invoke-Tool 'git' @('rev-parse', 'HEAD')
+  $hash = $rev.Output.Trim()
   Set-Content -Path (Join-Path $Destino 'ultimo-commit-estavel.txt') -Value $hash -NoNewline
   Log "Ponto de restauracao do codigo: $hash"
 
   # ---- 2) Snapshot ZIP local (sem .git nem node_modules) ----
   $zip = Join-Path $Destino ("innuva-codigo-{0}.zip" -f (Get-Date -Format 'yyyyMMdd-HHmm'))
-  tar -a -cf $zip --exclude '.git' --exclude 'node_modules' -C $RepoPath .
-  if ($LASTEXITCODE -eq 0 -and (Test-Path $zip)) {
+  $zipOut = Invoke-Tool 'tar' @('-a', '-cf', $zip, '--exclude', '.git', '--exclude', 'node_modules', '-C', $RepoPath, '.')
+  if ($zipOut.Code -eq 0 -and (Test-Path $zip)) {
     $tamanhoMB = [math]::Round((Get-Item $zip).Length / 1MB, 2)
     Log ("ZIP criado: {0} ({1} MB)" -f $zip, $tamanhoMB)
   } else {
-    Log 'ERRO: falha ao criar o snapshot ZIP.'
+    Log "ERRO: falha ao criar o snapshot ZIP. $($zipOut.Output)"
   }
 
   # ---- 3) Retencao: apaga zips antigos ----
