@@ -29,6 +29,25 @@ client.once('clientReady', async () => {
   console.log(`✅ Bot online como ${client.user.tag}`);
   iniciarAgendador(client);
   setInterval(() => verificarPendenciasExpiradas(client), 60000);
+
+  // Auto-registro dos comandos de barra no servidor (efeito imediato).
+  // Usa os segredos CLIENT_ID/GUILD_ID configurados no Fly.io; se estiverem
+  // ausentes, mantem o registro manual via node deploy-commands.js
+  try {
+    const clientId = process.env.CLIENT_ID;
+    const guildId = process.env.GUILD_ID;
+    if (clientId && guildId && process.env.DISCORD_TOKEN) {
+      const { REST, Routes } = require('discord.js');
+      const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+      const body = [...client.commands.values()].map(c => c.data.toJSON());
+      await rest.put(Routes.applicationGuildCommands(clientId, guildId), { body });
+      console.log(`🛠️ ${body.length} comandos registrados no servidor (${guildId}).`);
+    } else {
+      console.warn('⚠️ CLIENT_ID/GUILD_ID ausentes: registro automatico de comandos pulado.');
+    }
+  } catch (err) {
+    console.error('❌ Falha ao registrar comandos no boot:', err.message);
+  }
 });
 
 client.on('interactionCreate', (interaction) => {

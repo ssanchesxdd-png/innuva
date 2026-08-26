@@ -4,7 +4,8 @@
   "description": "Bot de vendas Innova Forn - tickets, saldo, cupons, pagamentos pendentes e recibos",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "register": "node deploy-commands.js"
   },
   "dependencies": {
     "discord.js": "^14.16.3",

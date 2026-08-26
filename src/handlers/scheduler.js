@@ -6,6 +6,7 @@
 const cron = require('node-cron');
 const { loadStore } = require('../storage');
 const { publicarCards } = require('./publicar');
+const { fazerBackup, listarBackups } = require('./backups');
 
 function iniciarAgendador(client) {
   // Roda a cada minuto
@@ -29,6 +30,27 @@ function iniciarAgendador(client) {
       }
     }
   });
+
+  // Backup diario dos dados da loja: copia o JSON de cada servidor para
+  // /data/backups/<guildId>/ antes da limpeza automatica dos antigos.
+  cron.schedule('0 3 * * *', async () => {
+    console.log('[backup] Rotina diaria iniciada.');
+    let feitos = 0;
+    for (const guild of client.guilds.cache.values()) {
+      try {
+        const r = fazerBackup(guild.id, { motivo: 'diario' });
+        if (r.ok) {
+          feitos++;
+          console.log(`[backup] ${guild.name}: ${r.fileName} (${(r.sizeBytes / 1024).toFixed(1)} KB, ${listarBackups(guild.id).length} no historico)`);
+        } else if (r.error !== 'Essa loja ainda nao possui dados salvos.') {
+          console.warn(`[backup] ${guild.name}: ${r.error}`);
+        }
+      } catch (err) {
+        console.error(`[backup] Falha em ${guild.name}:`, err.message);
+      }
+    }
+    console.log(`[backup] Rotina diaria concluida (${feitos} servidores com dados).`);
+  }, { timezone: 'America/Sao_Paulo' });
 
   console.log('Agendador de reenvio diário iniciado.');
 }

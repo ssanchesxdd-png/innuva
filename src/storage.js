@@ -51,6 +51,12 @@ function getFilePath(guildId) {
   return path.join(DATA_DIR, `${guildId}.json`);
 }
 
+// Caminho base dos dados. Exportado para modulos externos (ex: backups.js)
+// poderem acessar outros arquivos dentro de DATA_DIR sem duplicar a env var.
+function getDataDir() {
+  return DATA_DIR;
+}
+
 function loadStore(guildId) {
   const filePath = getFilePath(guildId);
   if (!fs.existsSync(filePath)) {
@@ -124,6 +130,7 @@ function addBalance(store, userId, amount) {
 module.exports = {
   loadStore,
   saveStore,
+  getDataDir,
   generateId,
   generatePurchaseId,
   defaultStore,
