@@ -27,6 +27,7 @@ const { v2Container, updateV2, montarContainerProduto } = require('../utils/v2')
 const { publicarCards } = require('./publicar');
 const { waitForAttachment, cancelPending } = require('../utils/attachmentCollector');
 const { abrirTicket, confirmarVenda, handleTicketButton, handleTicketSelect, fecharTicket, ehStaff, ticketPanelSelectRow } = require('./tickets');
+const { handleAvaliacaoButton, handleAvaliacaoSelect, handleAvaliacaoModal } = require('./avaliacoes');
 const { pagamentoAprovado, cancelarPendente, handleReferencia, handleComprarTambem, abrirModalEntrega, processarEntrega, enviarFotoReferencia } = require('./sales');
 
 // Paleta de cores disponivel no /config > Personalizacao
@@ -215,6 +216,8 @@ async function handleSelectMenu(interaction) {
       );
     return interaction.update({ components: [c], flags: MessageFlags.Ephemeral | MessageFlags.IsComponentsV2 });
   }
+  // ---- Avaliacao de clientes (staff) ----
+  if (id.startsWith('aval:')) return handleAvaliacaoSelect(interaction);
   // ---- Fluxo do ticket: seletores (produto/qty/cupom) ----
   if (id.startsWith('tk:')) return handleTicketSelect(interaction);
 
@@ -677,6 +680,8 @@ async function handleButton(interaction) {
   if (id === 'faq:abrir_ticket') {
     return abrirTicket(interaction, store, null, 'suporte');
   }
+  // ---- Avaliacao de clientes (staff) ----
+  if (id.startsWith('aval:')) return handleAvaliacaoButton(interaction);
   // ---- Fluxo do ticket (estagios) ----
   if (id.startsWith('tk:')) return handleTicketButton(interaction);
 
@@ -1151,6 +1156,8 @@ async function handleModalSubmit(interaction) {
   const id = interaction.customId;
   const store = loadStore(interaction.guildId);
 
+  // ---- Avaliacao de clientes (staff): modal de nota ----
+  if (id.startsWith('aval:modal:')) return handleAvaliacaoModal(interaction);
 
   if (id.startsWith('modal:entrega:')) {
     return processarEntrega(interaction);

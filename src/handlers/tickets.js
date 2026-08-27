@@ -25,6 +25,7 @@ const { privateLogContainer } = require('../utils/embeds');
 const { aplicarCupom, calcularDesconto, registrarUso } = require('./coupons');
 const { criarPendencia, pagamentoAprovado } = require('./sales');
 const { gerarPayloadPix, gerarQrBuffer } = require('../utils/pix');
+const { iniciarAvaliacao, resumoClienteContainer, agendarFechamento } = require('./avaliacoes');
 
 // O QR de cada pedido carrega o VALOR EXATO e o txid do ticket. Para nao
 // depender de upload binario dentro de callbacks de interacao (rejeitado
@@ -180,7 +181,8 @@ async function abrirTicket(interaction, store, tipoOuProduto, tipoId) {
     cart: null,
     couponCode: null,
     cartMessageId: null,
-    pendingId: null
+    pendingId: null,
+    assumidoPor: null // { id, tag, at } — staff responsavel pelo atendimento
   };
 
   if (tipo.id === 'compras') {
@@ -247,6 +249,23 @@ function resolverProduto(store, identificador) {
   return store.sales.products.find(p => p.name.toLowerCase() === String(identificador).toLowerCase()) || null;
 }
 
+// Linha de assumir ticket — visivel na mensagem principal enquanto ninguem assumiu
+function linhaAssumir(registro) {
+  if (registro.assumidoPor) {
+    return new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('tk:assumido')
+        .setLabel(`Assumido por ${registro.assumidoPor.tag}`.slice(0, 80))
+        .setStyle(ButtonStyle.Success)
+        .setEmoji('🙋')
+        .setDisabled(true)
+    );
+  }
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('tk:assumir').setLabel('Assumir Ticket').setStyle(ButtonStyle.Primary).setEmoji('🙋')
+  );
+}
+
 // Monta o payload da mensagem principal conforme o estagio atual
 function renderEstagio(store, registro) {
   const stage = registro.stage || 'welcome';
@@ -277,10 +296,30 @@ function renderEstagio(store, registro) {
   }
 
   else if (stage === 'select_produto') {
+    const produtos = store.sales.products.filter(p => p.stock > 0).slice(0, 25);
+
+    // Sem produtos em estoque o Discord rejeita seletor vazio (50035);
+    // mostra aviso no lugar.
+    if (produtos.length === 0) {
+      container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(
+          '**🛒 Nenhum produto disponível**\n\n' +
+          `Desculpa, <@${registro.userId}> — no momento **não há produtos em estoque**.\n` +
+          'Nossa equipe já foi avisada. Tente novamente mais tarde! 🙏'
+        )
+      );
+      container.addActionRowComponents(
+        new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId('tk:cancelar').setLabel('Cancelar').setStyle(ButtonStyle.Secondary).setEmoji('✖️')
+        )
+      );
+      container.addActionRowComponents(linhaAssumir(registro));
+      return { components: [container], flags: [MessageFlags.IsComponentsV2] };
+    }
+
     container.addTextDisplayComponents(
       new TextDisplayBuilder().setContent('**🛒 Escolha o produto**\n\nSelecione abaixo qual produto deseja comprar:')
     );
-    const produtos = store.sales.products.filter(p => p.stock > 0).slice(0, 25);
     const menu = new StringSelectMenuBuilder()
       .setCustomId('tk:produto')
       .setPlaceholder('Escolha o produto')
@@ -306,6 +345,7 @@ function renderEstagio(store, registro) {
           new ButtonBuilder().setCustomId('tk:prosseguir').setLabel('Escolher produto').setStyle(ButtonStyle.Primary)
         )
       );
+      container.addActionRowComponents(linhaAssumir(registro));
       return { components: [container], flags: [MessageFlags.IsComponentsV2] };
     }
 
@@ -449,6 +489,7 @@ function renderEstagio(store, registro) {
 
   // Estagio de pagamento retorna apenas componentes; a imagem do QR vive
   // como mensagem independente no canal (ver gerarPixQrDoPedido).
+  container.addActionRowComponents(linhaAssumir(registro));
   return { components: [container], flags: [MessageFlags.IsComponentsV2] };
 }
 
@@ -572,6 +613,39 @@ async function handleTicketButton(interaction) {
   }
 
   // ---- Acoes da staff ----
+  if (acao === 'assumir') {
+    if (!ehStaff(interaction)) {
+      return interaction.reply({ content: '🔒 Apenas a staff pode assumir tickets.', flags: MessageFlags.Ephemeral });
+    }
+    if (registro.assumidoPor) {
+      return interaction.reply({ content: `🙋 Este ticket já foi assumido por <@${registro.assumidoPor.id}>.`, flags: MessageFlags.Ephemeral });
+    }
+    registro.assumidoPor = { id: interaction.user.id, tag: interaction.user.tag, at: Date.now() };
+    saveStore(interaction.guildId, store);
+    await interaction.update(renderEstagio(store, registro));
+
+    // Resumo do historico do cliente para orientar o atendimento
+    const resumo = resumoClienteContainer(store, registro.userId, interaction.user.tag);
+    await interaction.followUp({
+      components: [resumo],
+      flags: MessageFlags.Ephemeral | MessageFlags.IsComponentsV2
+    }).catch(() => {});
+
+    // Log privado para a staff
+    if (store.logs.privateChannelId) {
+      const logChannel = await interaction.guild.channels.fetch(store.logs.privateChannelId).catch(() => null);
+      if (logChannel) {
+        const logContainer = privateLogContainer(
+          store,
+          '🙋 Ticket assumido pela staff',
+          `**Staff:** ${interaction.user.tag}\n**Cliente:** <@${registro.userId}>\n**Ticket:** ${interaction.channel}`
+        );
+        await logChannel.send({ components: [logContainer], flags: [MessageFlags.IsComponentsV2] }).catch(() => {});
+      }
+    }
+    return;
+  }
+
   if (acao === 'confirmar') {
     if (!ehStaff(interaction)) {
       return interaction.reply({ content: '🔒 Apenas a staff pode confirmar a entrega.', flags: MessageFlags.Ephemeral });
@@ -590,10 +664,13 @@ async function handleTicketButton(interaction) {
     if (!ehStaff(interaction)) {
       return interaction.reply({ content: '🔒 Apenas a staff pode encerrar o atendimento.', flags: MessageFlags.Ephemeral });
     }
-    await interaction.reply({ content: '🏁 Atendimento finalizado. Fechando o ticket em 5 segundos...' });
     delete store.ticket.open[interaction.channel.id];
     saveStore(interaction.guildId, store);
-    setTimeout(() => interaction.channel.delete('Atendimento finalizado pela staff').catch(() => {}), 5000);
+
+    // Staff avalia o cliente (ephemeral); o canal fecha apos a avaliacao
+    // (ou automaticamente depois de 10 min se ninguem responder)
+    await iniciarAvaliacao(interaction, store, registro.userId);
+    agendarFechamento(interaction.channel);
     return;
   }
 
@@ -731,6 +808,13 @@ async function fecharTicket(interaction) {
 
   delete store.ticket.open[interaction.channel.id];
   saveStore(interaction.guildId, store);
+
+  // Staff encerrando: abre a avaliacao do cliente antes de fechar o canal
+  if (isStaff) {
+    await iniciarAvaliacao(interaction, store, registro.userId);
+    agendarFechamento(interaction.channel);
+    return;
+  }
 
   await interaction.reply({ content: 'Fechando ticket em 5 segundos...' });
   setTimeout(() => {

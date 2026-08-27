@@ -34,6 +34,18 @@
 ### Botões internos de compra (`tk:*` e derivados)
 Prosseguir · Cancelar · Voltar · Continuar p/ Pagamento · Copiar chave Pix · Pagamento feito · Confirmar entrega (staff) · Finalizar atendimento (staff) · Referência · Comprar também · Avisar quando chegar
 
+## 🙋 Assumir Ticket (staff)
+- A mensagem principal de todo ticket tem o botão **🙋 Assumir Ticket** enquanto ninguém assumiu (apenas staff pode usar).
+- Ao assumir, o botão fica travado como "Assumido por @staff", a staff recebe um **resumo ephemeral do cliente** (compras anteriores, notas da staff, média de estrelas e ⚠️ alerta se o histórico for negativo) e o log privado registra a responsabilidade.
+
+## ⭐ Avaliação de clientes (staff)
+- Ao **Finalizar Atendimento** (ou fechar o ticket como staff), a staff recebe um prompt ephemeral para avaliar o cliente antes do canal fechar.
+- **Notas escritas**: máximo **2 por cliente** (modal com estrelas 1–4 + texto de até 500 caracteres).
+- **Estrelas**: sem limite de avaliações (seletor de 1 a 4 ⭐).
+- Quando o cliente já tem as 2 notas, as estrelas viram voto: **3–4⭐ = CONCORDO** / **1–2⭐ = DISCORDO** com as notas existentes.
+- Se ninguém avaliar, o canal fecha automaticamente após 10 minutos.
+- Dados salvos em `store.avaliacoes` por servidor (`notas`, `estrelas {soma, votos}`, `votosNotas`) e alimentam o resumo do cliente ao assumir tickets.
+
 ## 🔄 Automação
 | Rotina | Quando | O que faz |
 |---|---|---|
