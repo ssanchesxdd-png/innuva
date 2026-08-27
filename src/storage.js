@@ -49,7 +49,6 @@ function defaultStore() {
     coupons: [],    // { id, code, type: 'percent'|'fixed', value, uses, maxUses, expiresAt }
     pendings: [],   // vendas aguardando pagamento: { id, threadId, guildId, userId, productId, quantity, initialValue, discount, finalValue, couponCode, accountUsername, referenceImage, expiresAt }
     pixKey: null,   // chave Pix exibida nas vendas pendentes
-    pixQrUrl: null, // URL da imagem do QR Pix hospedada no Discord
     panelMessageId: null
   };
 }
@@ -112,7 +111,6 @@ function migrarCamposFaltantes(store) {
     { id: generateId('faq_'), pergunta: '💳 Quais as formas de pagamento?', resposta: 'Aceitamos pagamento via Pix. O comprovante é analisado pela staff e a entrega acontece logo após a confirmação.' }
   ];
   if (store.ticket && store.ticket.closeWindowMinutes === undefined) store.ticket.closeWindowMinutes = 10;
-  if (store.pixQrUrl === undefined) store.pixQrUrl = null;
   return store;
 }
 

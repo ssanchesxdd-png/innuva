@@ -37,10 +37,16 @@ function sanitizarTexto(texto, maxLen) {
     .toUpperCase() || 'LOJA';
 }
 
-function gerarPayloadPix({ chave, nome, cidade, valor = 0 }) {
+function gerarPayloadPix({ chave, nome, cidade, valor = 0, txid = '' }) {
   if (!chave || !String(chave).trim()) {
     throw new Error('Chave Pix vazia.');
   }
+
+  // Txid alfanumerico (max 25). Sem identificador usa '***' (padrao aceito).
+  const tidLimpo = String(txid || '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .slice(0, 25);
 
   let payload =
     campo('00', '01') +
@@ -59,7 +65,7 @@ function gerarPayloadPix({ chave, nome, cidade, valor = 0 }) {
     campo('58', 'BR') +
     campo('59', sanitizarTexto(nome, 25)) +
     campo('60', sanitizarTexto(cidade || 'SAO PAULO', 15)) +
-    campo('62', campo('05', '***'));
+    campo('62', campo('05', tidLimpo || '***'));
 
   return payload + campo('63', crc16(payload + '6304'));
 }
