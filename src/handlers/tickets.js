@@ -26,11 +26,35 @@ const { aplicarCupom, calcularDesconto, registrarUso } = require('./coupons');
 const { criarPendencia, pagamentoAprovado } = require('./sales');
 const { gerarPayloadPix, gerarQrBuffer } = require('../utils/pix');
 
-// O QR de cada pedido agora carrega o VALOR EXATO e o txid do ticket,
-// entao é gerado individualmente no momento em que o cliente entra na
-// etapa de pagamento e anexado à própria mensagem (arquivo temporário
-// armazenado apenas em registro.pixQrB64, limpo ao sair da etapa).
+// O QR de cada pedido carrega o VALOR EXATO e o txid do ticket. Para nao
+// depender de upload binario dentro de callbacks de interacao (rejeitado
+// com 50035 em alguns casos), a imagem e postada como mensagem propria no
+// canal do ticket e a galeria referencia a URL remota do CDN do Discord.
 const NOME_ARQUIVO_PIX = 'innova-pix-pedido.png';
+
+async function gerarPixQrDoPedido(channel, store, registro, { valor }) {
+  registro.pixQrUrl = null;
+  if (!store.pixKey || !(valor > 0)) return;
+
+  try {
+    const payload = gerarPayloadPix({
+      chave: store.pixKey,
+      nome: store.storeName || 'Innova Forn',
+      cidade: process.env.PIX_CITY || 'SAO PAULO',
+      valor,
+      txid: channel.id.slice(0, 25)
+    });
+    const buf = await gerarQrBuffer(payload);
+    const msgQr = await channel.send({
+      content: `📷 **Escaneie para pagar R$ ${valor.toFixed(2)}** *(Pix com valor preenchido)*`,
+      files: [{ attachment: buf, name: NOME_ARQUIVO_PIX }]
+    });
+    const url = msgQr.attachments.first()?.url;
+    if (url) registro.pixQrUrl = url;
+  } catch (err) {
+    console.error('[pix] erro ao gerar QR do pedido:', err.message);
+  }
+}
 
 // Tipos de ticket disponíveis no seletor do painel
 const TIPOS_TICKET = {
@@ -358,13 +382,13 @@ function renderEstagio(store, registro) {
       )
     );
 
-    // QR Code do Pix deste pedido, com valor exato (anexo da propria mensagem)
-    if (store.pixKey && registro.pixQrB64) {
+    // QR Code do Pix deste pedido (mensagem com a imagem ja postada no canal)
+    if (store.pixKey && registro.pixQrUrl) {
       container.addSeparatorComponents(new SeparatorBuilder());
       container.addMediaGalleryComponents(
         new MediaGalleryBuilder().addItems(
           new MediaGalleryItemBuilder()
-            .setMedia(`attachment://${NOME_ARQUIVO_PIX}`)
+            .setMedia(registro.pixQrUrl)
             .setDescription(`Escaneie para pagar R$ ${total.toFixed(2)} via Pix`)
         )
       );
@@ -423,14 +447,9 @@ function renderEstagio(store, registro) {
     );
   }
 
-  // Anexa o PNG do QR quando o estagio atual exibe o pagamento
-  const saida = { components: [container], flags: [MessageFlags.IsComponentsV2] };
-  if ((registro.stage || 'welcome') === 'pagamento' && registro.pixQrB64) {
-    saida.files = [
-      new AttachmentBuilder(Buffer.from(registro.pixQrB64, 'base64'), { name: NOME_ARQUIVO_PIX })
-    ];
-  }
-  return saida;
+  // Estagio de pagamento retorna apenas componentes; a imagem do QR vive
+  // como mensagem independente no canal (ver gerarPixQrDoPedido).
+  return { components: [container], flags: [MessageFlags.IsComponentsV2] };
 }
 
 // Edita a mensagem principal do ticket para o estagio atual
@@ -501,40 +520,31 @@ async function handleTicketButton(interaction) {
       return interaction.reply({ content: '❌ Estoque insuficiente para este pedido.', flags: MessageFlags.Ephemeral });
     }
     registro.stage = 'pagamento';
-    // Gera o QR deste pedido com o VALOR EXATO cobrado (payload EMV proprio)
-    if (store.pixKey && registro.cart) {
-      try {
-        const prod = store.sales.products.find(p => p.id === registro.cart.produtoId);
-        const qtd = registro.cart.quantity || 1;
-        const subtotal = prod ? Math.round(prod.price * qtd * 100) / 100 : 0;
-        let desconto = 0;
-        if (registro.couponCode && prod) {
-          const cupom = store.coupons.find(c => c.code === registro.couponCode);
-          if (cupom) desconto = Math.round(calcularDesconto(cupom, subtotal) * 100) / 100;
-        }
-        const totalPedido = Math.max(0, Math.round((subtotal - desconto) * 100) / 100);
-
-        const payload = gerarPayloadPix({
-          chave: store.pixKey,
-          nome: store.storeName || 'Innova Forn',
-          cidade: process.env.PIX_CITY || 'SAO PAULO',
-          valor: totalPedido,
-          txid: interaction.channel.id.slice(0, 25)
-        });
-        const buf = await gerarQrBuffer(payload);
-        registro.pixQrB64 = buf.toString('base64');
-      } catch (err) {
-        console.error('[pix] erro ao gerar QR do pedido:', err.message);
-        registro.pixQrB64 = null;
-      }
-    }
     saveStore(interaction.guildId, store);
-    return interaction.update(renderEstagio(store, registro));
+
+    // Ack imediato: gerar/postar o QR pode levar mais que 3s
+    await interaction.deferUpdate();
+
+    if (store.pixKey && registro.cart) {
+      const prod = store.sales.products.find(p => p.id === registro.cart.produtoId);
+      const qtd = registro.cart.quantity || 1;
+      const subtotal = prod ? Math.round(prod.price * qtd * 100) / 100 : 0;
+      let desconto = 0;
+      if (registro.couponCode && prod) {
+        const cupom = store.coupons.find(c => c.code === registro.couponCode);
+        if (cupom) desconto = Math.round(calcularDesconto(cupom, subtotal) * 100) / 100;
+      }
+      const totalPedido = Math.max(0, Math.round((subtotal - desconto) * 100) / 100);
+      await gerarPixQrDoPedido(interaction.channel, store, registro, { valor: totalPedido });
+      saveStore(interaction.guildId, store);
+    }
+
+    return interaction.editReply(renderEstagio(store, registro));
   }
 
   if (acao === 'voltar') {
     registro.stage = 'carrinho';
-    registro.pixQrB64 = null;
+    registro.pixQrUrl = null;
     saveStore(interaction.guildId, store);
     return interaction.update(renderEstagio(store, registro));
   }
@@ -556,7 +566,7 @@ async function handleTicketButton(interaction) {
     registro.stage = 'comprovante';
     registro.cart = null;
     registro.couponCode = null;
-    registro.pixQrB64 = null;
+    registro.pixQrUrl = null;
     saveStore(interaction.guildId, store);
     return interaction.editReply(renderEstagio(store, registro));
   }
