@@ -20,6 +20,7 @@ const { loadStore, saveStore, generatePurchaseId } = require('../storage');
 const encerrarCanalTicket = (...args) => require('./tickets').encerrarCanalTicket(...args);
 const { referenciaContainer, privateLogContainer, publicSaleContainer } = require('../utils/embeds');
 const { registrarUso } = require('./coupons');
+const { aoConcluirPrimeiraCompra } = require('./roles');
 const { publicarCards } = require('./publicar');
 const { waitForAttachment, waitForAttachmentInChannel } = require('../utils/attachmentCollector');
 
@@ -169,8 +170,17 @@ async function pagamentoAprovado(interaction, pendingId) {
     date: Date.now()
   };
 
+  // Detecta a primeira compra ANTES de registrar no historico
+  // (usado para conceder o cargo de Comprador)
+  const primeiraCompra = !store.sales.history.some(c => c.buyerId === pending.userId);
+
   store.sales.history.push(compra);
   saveStore(interaction.guildId, store);
+
+  // Cargo de "Comprador" na primeira compra concluida
+  if (primeiraCompra) {
+    await aoConcluirPrimeiraCompra(interaction.guild, store, pending.userId).catch(() => {});
+  }
 
   // Atualiza o card do produto nos canais de venda (estoque caiu)
   await publicarCards(interaction.guild).catch(() => {});

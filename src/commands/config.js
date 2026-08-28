@@ -29,6 +29,7 @@ module.exports = {
         { label: 'Configurações de Vendas', value: 'vendas', emoji: '💰', description: 'Produtos, preços, estoque, canais e horários' },
         { label: 'Configurações de Ticket', value: 'ticket', emoji: '🎫', description: 'Canal do painel de suporte/ticket' },
         { label: 'Configurações de Logs', value: 'logs', emoji: '📋', description: 'Canais de log privado e público' },
+        { label: 'Cargos Automáticos', value: 'cargos', emoji: '🏷️', description: 'Cargo de Novo Cliente (1º ticket) e Comprador (1ª compra)' },
         { label: 'Personalização', value: 'personalizacao', emoji: '🎨', description: 'Nome do bot, nome da loja, cor e imagens' }
       ]);
 
@@ -38,6 +39,7 @@ module.exports = {
         `- **Configuração de vendas:** adicione produtos, preços e estoque.\n` +
         `- **Configuração de tickets:** setar o canal de suporte.\n` +
         `- **Configuração de logs:** setar os canais de log públicos e privados.\n` +
+        `- **Cargos automáticos:** cargo de Novo Cliente e Comprador.\n` +
         `- **Personalização:** personalize o nome do bot, da loja e escolha a cor.`,
       rows: [new ActionRowBuilder().addComponents(menu)]
     });

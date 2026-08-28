@@ -50,6 +50,11 @@ function defaultStore() {
     pendings: [],   // vendas aguardando pagamento: { id, threadId, guildId, userId, productId, quantity, initialValue, discount, finalValue, couponCode, accountUsername, referenceImage, expiresAt }
     pixKey: null,   // chave Pix exibida nas vendas pendentes
     avaliacoes: {}, // userId -> { notas: [{ texto, estrelas, staffId, staffTag, channelId, date }], estrelas: { soma, votos }, votosNotas: [{ staffId, staffTag, voto, estrelas, date }] }
+    roles: {
+      novoCliente: null, // cargo concedido ao abrir o primeiro ticket
+      comprador: null    // cargo concedido ao concluir a primeira compra
+    },
+    clientes: {},   // userId -> { primeiroTicketEm, primeiraCompraEm }
     panelMessageId: null
   };
 }
@@ -103,6 +108,8 @@ function migrarCamposFaltantes(store) {
   if (!Array.isArray(store.pendings)) store.pendings = [];
   if (store.pixKey === undefined) store.pixKey = null;
   if (!store.avaliacoes) store.avaliacoes = {};
+  if (!store.roles) store.roles = { novoCliente: null, comprador: null };
+  if (!store.clientes) store.clientes = {};
   if (store.ticket && store.ticket.pendingMinutes === undefined) store.ticket.pendingMinutes = 30;
   if (store.ticket && !store.ticket.categories) store.ticket.categories = { suporte: null, compras: null };
   if (store.ticket && !store.ticket.open) store.ticket.open = {};

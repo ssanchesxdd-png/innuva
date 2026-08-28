@@ -26,6 +26,7 @@ const { aplicarCupom, calcularDesconto, registrarUso } = require('./coupons');
 const { criarPendencia, pagamentoAprovado } = require('./sales');
 const { gerarPayloadPix, gerarQrBuffer } = require('../utils/pix');
 const { iniciarAvaliacao, resumoClienteContainer, agendarFechamento } = require('./avaliacoes');
+const { aoAbrirPrimeiroTicket } = require('./roles');
 
 // O QR de cada pedido carrega o VALOR EXATO e o txid do ticket. Para nao
 // depender de upload binario dentro de callbacks de interacao (rejeitado
@@ -195,6 +196,12 @@ async function abrirTicket(interaction, store, tipoOuProduto, tipoId) {
 
   store.ticket.open[canal.id] = registro;
   saveStore(interaction.guildId, store);
+
+  // Cargo de "Novo Cliente" na primeira vez que o usuario abre um ticket
+  // (staff nao conta como cliente)
+  if (!ehStaff(interaction)) {
+    await aoAbrirPrimeiroTicket(interaction.guild, store, interaction.user.id).catch(() => {});
+  }
 
   // Mensagem UNICA do ticket (se transforma por estagios)
   const principal = await canal.send(renderEstagio(store, registro)).catch(err => {

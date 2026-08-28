@@ -29,10 +29,19 @@
 - 💰 **Vendas**: produtos (add/editar/preço/estoque/remover), canais de envio, horários, chave Pix, card padrão
 - 🎫 **Ticket**: canal do painel, categorias (Suporte/Compras), prazo pendente, janela de fechamento, FAQ (add/remover/listar)
 - 📋 **Logs**: canais privado e público
+- 🏷️ **Cargos Automáticos**: cargo de Novo Cliente (1º ticket) e Comprador (1ª compra)
 - 🎨 **Personalização**: nome do bot/loja, cor (12 opções), imagens (produto/ticket/logs)
 
 ### Botões internos de compra (`tk:*` e derivados)
 Prosseguir · Cancelar · Voltar · Continuar p/ Pagamento · Copiar chave Pix · Pagamento feito · Confirmar entrega (staff) · Finalizar atendimento (staff) · Referência · Comprar também · Avisar quando chegar
+
+## 🏷️ Cargos Automáticos
+- Configurados em `/config` > **Cargos Automáticos** (salvos por servidor em `store.roles`).
+- **🎫 Novo Cliente**: concedido na primeira vez que o usuário abre um ticket (qualquer tipo; staff não conta).
+- **🛒 Comprador**: concedido quando a primeira compra do usuário é aprovada (pagamento confirmado).
+- Cada concessão registra `store.clientes[userId]` (primeiro ticket/primeira compra), aparece no **log privado** e avisa o cliente por **DM**.
+- Requisitos no Discord: bot com permissão **Gerenciar Cargos** e seu cargo **acima** dos cargos configurados. Caso contrário, a concessão falha sem quebrar o fluxo da venda.
+- Para limpar um cargo configurado, envie o seletor da categoria sem nenhum cargo selecionado.
 
 ## 🙋 Assumir Ticket (staff)
 - A mensagem principal de todo ticket tem o botão **🙋 Assumir Ticket** enquanto ninguém assumiu (apenas staff pode usar).
