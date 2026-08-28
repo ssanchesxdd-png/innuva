@@ -9,11 +9,15 @@ const { handleInteraction, handleMessage } = require('./src/handlers/interaction
 const { ticketMessageHook } = require('./src/handlers/tickets');
 const { iniciarAgendador } = require('./src/handlers/scheduler');
 const { verificarPendenciasExpiradas } = require('./src/handlers/sales');
+const { aoEntrarNovoMembro } = require('./src/handlers/roles');
 
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages
+    GatewayIntentBits.GuildMessages,
+    // Necessario para o evento guildMemberAdd (cargo de Novo Membro).
+    // Exige "Server Members Intent" ativado no Discord Developer Portal.
+    GatewayIntentBits.GuildMembers
   ]
 });
 
@@ -69,6 +73,13 @@ client.on('interactionCreate', (interaction) => {
 client.on('messageCreate', (message) => {
   handleMessage(message);
   ticketMessageHook(message);
+});
+
+// Cargo de "Novo Membro" quando alguem entra no servidor
+client.on('guildMemberAdd', (member) => {
+  aoEntrarNovoMembro(member.guild, member).catch(err => {
+    console.error('[cargos] Erro ao processar novo membro:', err.message);
+  });
 });
 
 // Evita que erros inesperados derrubem o bot inteiro

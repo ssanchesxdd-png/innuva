@@ -37,10 +37,11 @@ Prosseguir · Cancelar · Voltar · Continuar p/ Pagamento · Copiar chave Pix �
 
 ## 🏷️ Cargos Automáticos
 - Configurados em `/config` > **Cargos Automáticos** (salvos por servidor em `store.roles`).
-- **🎫 Novo Cliente**: concedido na primeira vez que o usuário abre um ticket (qualquer tipo; staff não conta).
-- **🛒 Comprador**: concedido quando a primeira compra do usuário é aprovada (pagamento confirmado).
-- Cada concessão registra `store.clientes[userId]` (primeiro ticket/primeira compra), aparece no **log privado** e avisa o cliente por **DM**.
+- **🛒 Comprador**: concedido quando o usuário conclui a **primeira compra** (pagamento aprovado).
+- **👋 Novo Membro**: concedido automaticamente quando alguém **entra no servidor** (`guildMemberAdd`; bots são ignorados).
+- A primeira compra registra `store.clientes[userId]` e aparece no **log privado** + **DM** para o cliente.
 - Requisitos no Discord: bot com permissão **Gerenciar Cargos** e seu cargo **acima** dos cargos configurados. Caso contrário, a concessão falha sem quebrar o fluxo da venda.
+- O cargo de Novo Membro exige o **Server Members Intent** ativado no Discord Developer Portal (Bot → Privileged Gateway Intents).
 - Para limpar um cargo configurado, envie o seletor da categoria sem nenhum cargo selecionado.
 
 ## 🙋 Assumir Ticket (staff)

@@ -1,25 +1,25 @@
 // src/handlers/roles.js
 // Concessao automatica de cargos por evento:
-// - "novoCliente": usuario abriu um ticket pela primeira vez
-// - "comprador": usuario concluiu a primeira compra (pagamento aprovado)
+// - "primeiraCompra": usuario concluiu a primeira compra (pagamento aprovado)
+// - "novoMembro": membro entrou no servidor do Discord (guildMemberAdd)
 // Os cargos sao configurados por servidor em /config > Cargos Automaticos
-// e ficam salvos em store.roles. O controle de quem ja e cliente fica em
-// store.clientes (userId -> { primeiroTicketEm, primeiraCompraEm }).
+// e ficam salvos em store.roles. O controle de quem ja comprou fica em
+// store.clientes (userId -> { primeiraCompraEm }).
 
 const { MessageFlags, ContainerBuilder, TextDisplayBuilder } = require('discord.js');
-const { saveStore } = require('../storage');
+const { saveStore, loadStore } = require('../storage');
 const { privateLogContainer } = require('../utils/embeds');
 
 const TIPOS_CARGO = {
-  novoCliente: 'Novo Cliente',
-  comprador: 'Comprador'
+  primeiraCompra: 'Comprador',
+  novoMembro: 'Novo Membro'
 };
 
 // Garante o registro do cliente e retorna true se ele for novo no controle
 function registrarCliente(store, userId) {
   if (!store.clientes) store.clientes = {};
   if (!store.clientes[userId]) {
-    store.clientes[userId] = { primeiroTicketEm: null, primeiraCompraEm: null };
+    store.clientes[userId] = { primeiraCompraEm: null };
     return true;
   }
   return false;
@@ -41,42 +41,54 @@ async function concederCargo(guild, store, userId, tipo) {
   }
 }
 
-// Primeiro ticket aberto pelo usuario
-async function aoAbrirPrimeiroTicket(guild, store, userId) {
-  const novo = registrarCliente(store, userId);
-  if (!novo) return;
-  store.clientes[userId].primeiroTicketEm = Date.now();
-  const concedido = await concederCargo(guild, store, userId, 'novoCliente');
-  saveStore(guild.id, store);
-  if (concedido) {
-    await avisar(guild, store, userId, 'novoCliente');
-  }
-}
-
 // Primeira compra concluida (pagamento aprovado)
 async function aoConcluirPrimeiraCompra(guild, store, userId) {
   registrarCliente(store, userId);
   if (!store.clientes[userId].primeiraCompraEm) {
     store.clientes[userId].primeiraCompraEm = Date.now();
   }
-  const concedido = await concederCargo(guild, store, userId, 'comprador');
+  const concedido = await concederCargo(guild, store, userId, 'primeiraCompra');
   saveStore(guild.id, store);
   if (concedido) {
-    await avisar(guild, store, userId, 'comprador');
+    await avisarCompra(guild, store, userId);
   }
 }
 
-// Log privado + DM avisando do cargo recebido
-async function avisar(guild, store, userId, tipo) {
-  const nome = TIPOS_CARGO[tipo];
+// Novo membro entrou no servidor (cargo de boas-vindas)
+async function aoEntrarNovoMembro(guild, member) {
+  const store = loadStore(guild.id);
+  const roleId = store.roles?.novoMembro;
+  if (!roleId || member.user.bot) return;
+  try {
+    if (member.roles.cache.has(roleId)) return;
+    await member.roles.add(roleId, 'Concessao automatica: cargo Novo Membro');
+    if (store.logs.privateChannelId) {
+      const logChannel = await guild.channels.fetch(store.logs.privateChannelId).catch(() => null);
+      if (logChannel) {
+        const logContainer = privateLogContainer(
+          store,
+          '🏷️ Cargo automático concedido — Novo Membro',
+          `**Membro:** <@${member.id}> (${member.user.tag})\n` +
+          `**Motivo:** entrou no servidor`
+        );
+        await logChannel.send({ components: [logContainer], flags: [MessageFlags.IsComponentsV2] }).catch(() => {});
+      }
+    }
+  } catch (err) {
+    console.error(`[cargos] Falha ao conceder cargo "novoMembro" para ${member.id}:`, err.message);
+  }
+}
+
+// Log privado + DM avisando do cargo de comprador
+async function avisarCompra(guild, store, userId) {
   if (store.logs.privateChannelId) {
     const logChannel = await guild.channels.fetch(store.logs.privateChannelId).catch(() => null);
     if (logChannel) {
       const logContainer = privateLogContainer(
         store,
-        `🏷️ Cargo automático concedido — ${nome}`,
+        '🏷️ Cargo automático concedido — Comprador',
         `**Membro:** <@${userId}>\n` +
-        `**Motivo:** ${tipo === 'novoCliente' ? 'abriu o primeiro ticket' : 'concluiu a primeira compra'}`
+        `**Motivo:** concluiu a primeira compra`
       );
       await logChannel.send({ components: [logContainer], flags: [MessageFlags.IsComponentsV2] }).catch(() => {});
     }
@@ -91,8 +103,8 @@ async function avisar(guild, store, userId, tipo) {
           .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(
               `**🏷️ Você recebeu um cargo — ${store.storeName}**\n\n` +
-              `Parabéns <@${userId}>! Você acaba de ganhar o cargo **${nome}**.` +
-              (tipo === 'comprador' ? '\n\nObrigado pela sua primeira compra! ❤️' : '')
+              `Parabéns <@${userId}>! Você acaba de ganhar o cargo **Comprador**.\n\n` +
+              `Obrigado pela sua primeira compra! ❤️`
             )
           )
       ],
@@ -102,7 +114,7 @@ async function avisar(guild, store, userId, tipo) {
 }
 
 module.exports = {
-  aoAbrirPrimeiroTicket,
   aoConcluirPrimeiraCompra,
+  aoEntrarNovoMembro,
   registrarCliente
 };

@@ -51,8 +51,8 @@ function defaultStore() {
     pixKey: null,   // chave Pix exibida nas vendas pendentes
     avaliacoes: {}, // userId -> { notas: [{ texto, estrelas, staffId, staffTag, channelId, date }], estrelas: { soma, votos }, votosNotas: [{ staffId, staffTag, voto, estrelas, date }] }
     roles: {
-      novoCliente: null, // cargo concedido ao abrir o primeiro ticket
-      comprador: null    // cargo concedido ao concluir a primeira compra
+      primeiraCompra: null, // cargo concedido ao concluir a primeira compra
+      novoMembro: null      // cargo concedido ao entrar no servidor
     },
     clientes: {},   // userId -> { primeiroTicketEm, primeiraCompraEm }
     panelMessageId: null
@@ -108,7 +108,12 @@ function migrarCamposFaltantes(store) {
   if (!Array.isArray(store.pendings)) store.pendings = [];
   if (store.pixKey === undefined) store.pixKey = null;
   if (!store.avaliacoes) store.avaliacoes = {};
-  if (!store.roles) store.roles = { novoCliente: null, comprador: null };
+  if (!store.roles) store.roles = { primeiraCompra: null, novoMembro: null };
+  // Migracao da versao antiga (novoCliente/comprador por ticket/compra)
+  if (store.roles.primeiraCompra === undefined) store.roles.primeiraCompra = store.roles.comprador ?? null;
+  if (store.roles.novoMembro === undefined) store.roles.novoMembro = null;
+  delete store.roles.novoCliente;
+  delete store.roles.comprador;
   if (!store.clientes) store.clientes = {};
   if (store.ticket && store.ticket.pendingMinutes === undefined) store.ticket.pendingMinutes = 30;
   if (store.ticket && !store.ticket.categories) store.ticket.categories = { suporte: null, compras: null };
@@ -149,5 +154,6 @@ module.exports = {
   getDataDir,
   generateId,
   generatePurchaseId,
-  defaultStore
+  defaultStore,
+  migrarCamposFaltantes
 };

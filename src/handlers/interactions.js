@@ -117,7 +117,7 @@ async function mostrarMenuRoot(interaction) {
       { label: 'Configurações de Vendas', value: 'vendas', emoji: '💰', description: 'Produtos, preços, estoque, canais e horários' },
       { label: 'Configurações de Ticket', value: 'ticket', emoji: '🎫', description: 'Canal do painel de suporte/ticket' },
       { label: 'Configurações de Logs', value: 'logs', emoji: '📋', description: 'Canais de log privado e público' },
-      { label: 'Cargos Automáticos', value: 'cargos', emoji: '🏷️', description: 'Cargo de Novo Cliente (1º ticket) e Comprador (1ª compra)' },
+      { label: 'Cargos Automáticos', value: 'cargos', emoji: '🏷️', description: 'Cargo de Comprador (1ª compra) e Novo Membro (entrada no servidor)' },
       { label: 'Personalização', value: 'personalizacao', emoji: '🎨', description: 'Nome do bot, nome da loja, cor e imagens' }
     ]);
 
@@ -127,7 +127,7 @@ async function mostrarMenuRoot(interaction) {
       `- **Configuração de vendas:** adicione produtos, preços e estoque.\n` +
       `- **Configuração de tickets:** setar o canal de suporte.\n` +
       `- **Configuração de logs:** setar os canais de log públicos e privados.\n` +
-      `- **Cargos automáticos:** cargo de Novo Cliente e Comprador.\n` +
+      `- **Cargos automáticos:** cargo de Comprador e Novo Membro.\n` +
       `- **Personalização:** personalize o nome do bot, da loja e escolha a cor.`,
     rows: [new ActionRowBuilder().addComponents(menu)]
   });
@@ -590,31 +590,32 @@ async function mostrarConfirmacaoRemover(interaction, store, produtoId) {
 async function mostrarMenuCargos(interaction, store) {
   if (!store.roles) store.roles = { novoCliente: null, comprador: null };
 
-  const cargoNovoCliente = new RoleSelectMenuBuilder()
-    .setCustomId('config:cargo:novoCliente')
-    .setPlaceholder('Cargo para quem abrir o 1º ticket (Novo Cliente)')
+  const cargoPrimeiraCompra = new RoleSelectMenuBuilder()
+    .setCustomId('config:cargo:primeiraCompra')
+    .setPlaceholder('Cargo para quem comprar pela 1ª vez (Comprador)')
     .setMinValues(0)
     .setMaxValues(1);
 
-  const cargoComprador = new RoleSelectMenuBuilder()
-    .setCustomId('config:cargo:comprador')
-    .setPlaceholder('Cargo para quem concluir a 1ª compra (Comprador)')
+  const cargoNovoMembro = new RoleSelectMenuBuilder()
+    .setCustomId('config:cargo:novoMembro')
+    .setPlaceholder('Cargo para quem entrar no servidor (Novo Membro)')
     .setMinValues(0)
     .setMaxValues(1);
 
   const container = v2Container(store, {
     title: '🏷️ Cargos Automáticos',
     description:
-      'O bot concede cargos automaticamente para os clientes:\n\n' +
-      `**🎫 Novo Cliente** — concedido na primeira vez que a pessoa abre um ticket.\n` +
-      `Cargo atual: ${store.roles.novoCliente ? `<@&${store.roles.novoCliente}>` : '⚠️ não configurado'}\n\n` +
-      `**🛒 Comprador** — concedido quando a primeira compra é aprovada.\n` +
-      `Cargo atual: ${store.roles.comprador ? `<@&${store.roles.comprador}>` : '⚠️ não configurado'}\n\n` +
+      'O bot concede cargos automaticamente:\n\n' +
+      `**🛒 Comprador** — concedido quando alguém conclui a primeira compra (pagamento aprovado).\n` +
+      `Cargo atual: ${store.roles.primeiraCompra ? `<@&${store.roles.primeiraCompra}>` : '⚠️ não configurado'}\n\n` +
+      `**👋 Novo Membro** — concedido automaticamente quando alguém entra no servidor.\n` +
+      `Cargo atual: ${store.roles.novoMembro ? `<@&${store.roles.novoMembro}>` : '⚠️ não configurado'}\n\n` +
       '⚠️ O cargo do bot precisa estar **acima** dos cargos escolhidos e o bot precisa da permissão **Gerenciar Cargos**.\n' +
+      '⚠️ Para o cargo de Novo Membro, o **Server Members Intent** precisa estar ativado no Discord Developer Portal.\n' +
       'Para limpar uma configuração, envie o seletor sem nenhum cargo selecionado.',
     rows: [
-      new ActionRowBuilder().addComponents(cargoNovoCliente),
-      new ActionRowBuilder().addComponents(cargoComprador)
+      new ActionRowBuilder().addComponents(cargoPrimeiraCompra),
+      new ActionRowBuilder().addComponents(cargoNovoMembro)
     ],
     sections: [secaoVoltar('root')]
   });
@@ -628,7 +629,7 @@ async function handleRoleSelectMenu(interaction) {
 
   if (id.startsWith('config:cargo:')) {
     const tipo = id.split(':')[2];
-    if (!store.roles) store.roles = { novoCliente: null, comprador: null };
+    if (!store.roles) store.roles = { primeiraCompra: null, novoMembro: null };
     store.roles[tipo] = interaction.values[0] || null;
     saveStore(interaction.guildId, store);
     return mostrarMenuCargos(interaction, store);
