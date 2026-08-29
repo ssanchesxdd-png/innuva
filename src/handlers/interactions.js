@@ -1252,10 +1252,32 @@ async function handleModalSubmit(interaction) {
 
   if (id === 'modal:horarios') {
     const texto = interaction.fields.getTextInputValue('horarios');
-    const horarios = texto.split(',').map(h => h.trim()).filter(h => /^\d{1,2}:\d{2}$/.test(h));
-    store.sales.sendTimes = horarios;
+    const validos = [];
+    const invalidos = [];
+    for (const bruto of texto.split(',')) {
+      const h = bruto.trim();
+      if (!h) continue;
+      const m = h.match(/^(\d{1,2}):(\d{2})$/);
+      const hh = m ? parseInt(m[1], 10) : NaN;
+      const mm = m ? parseInt(m[2], 10) : NaN;
+      if (m && hh >= 0 && hh <= 23 && mm >= 0 && mm <= 59) {
+        // Normaliza para "HH:MM" (2 digitos) — formato que o scheduler compara
+        const norm = `${String(hh).padStart(2, '0')}:${m[2]}`;
+        if (!validos.includes(norm)) validos.push(norm);
+      } else {
+        invalidos.push(h);
+      }
+    }
+    store.sales.sendTimes = validos;
     saveStore(interaction.guildId, store);
-    return interaction.reply({ content: `✅ Horários definidos: ${horarios.join(', ') || 'nenhum válido'}`, flags: MessageFlags.Ephemeral });
+
+    let resposta = validos.length
+      ? `✅ Horários definidos: ${validos.join(', ')}`
+      : '❌ Nenhum horário válido informado (use o formato HH:MM, ex: `09:00, 18:30`)';
+    if (invalidos.length) {
+      resposta += `\n⚠️ Ignorados por estarem inválidos: ${invalidos.join(', ')}`;
+    }
+    return interaction.reply({ content: resposta, flags: MessageFlags.Ephemeral });
   }
 
   if (id === 'modal:pix_key') {

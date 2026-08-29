@@ -31,24 +31,79 @@ function horaAtualNoFuso(date = new Date()) {
   return `${hh}:${partes.minute}`;
 }
 
+// Dia ("YYYY-MM-DD") e minuto do dia (0..1439) no fuso da loja.
+// Usado para a logica de "catch-up": se o bot reiniciar no minuto exato
+// do envio, o envio do dia ainda acontece (nao fica preso a 1 tick).
+function diaEMinutoNoFuso(date = new Date()) {
+  const fmt = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: FUSO_HORARIO,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23'
+  });
+  const p = {};
+  for (const part of fmt.formatToParts(date)) p[part.type] = part.value;
+  const dia = `${p.year}-${p.month}-${p.day}`;
+  const hh = p.hour === '24' ? 0 : parseInt(p.hour, 10);
+  return { dia, minuto: hh * 60 + parseInt(p.minute, 10) };
+}
+
+// Normaliza "H:MM" ou "HH:MM" para "HH:MM" (aceita dados antigos com 1 digito)
+function normalizarHorario(h) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(h).trim());
+  if (!m) return null;
+  const hh = parseInt(m[1], 10);
+  const mm = parseInt(m[2], 10);
+  if (hh > 23 || mm > 59) return null;
+  return `${String(hh).padStart(2, '0')}:${m[2]}`;
+}
+
 function iniciarAgendador(client) {
   // Roda a cada minuto
   cron.schedule('* * * * *', async () => {
-    const horaAtual = horaAtualNoFuso();
+    const { dia, minuto: minutoAtual } = diaEMinutoNoFuso();
 
     for (const guild of client.guilds.cache.values()) {
       const store = loadStore(guild.id);
-      const horarios = store.sales.sendTimes || [];
       const canais = store.sales.sendChannelIds || [];
 
-      if (!horarios.includes(horaAtual) || canais.length === 0) continue;
+      // Horarios normalizados em minuto do dia, ordenados
+      const alvos = (store.sales.sendTimes || [])
+        .map(normalizarHorario)
+        .filter(Boolean)
+        .map(h => {
+          const [hh, mm] = h.split(':').map(Number);
+          return hh * 60 + mm;
+        })
+        .sort((a, b) => a - b);
+
+      if (alvos.length === 0 || canais.length === 0) continue;
+
+      // Catch-up: dispara o maior horario agendado que ja passou hoje e que
+      // ainda nao foi enviado (ultimo enviado registrado em sales.lastAutoSend).
+      // Assim, um restart do bot no minuto exato do envio nao perde o dia.
+      const ultimo = store.sales.lastAutoSend;
+      const alvo = alvos
+        .filter(m => m <= minutoAtual)
+        .filter(m => !(ultimo && ultimo.dia === dia && m <= ultimo.minuto))
+        .pop();
+
+      if (alvo === undefined) continue;
+
+      store.sales.lastAutoSend = { dia, minuto: alvo };
+      saveStore(guild.id, store);
 
       const res = await publicarCards(guild).catch(err => {
         console.error(`Erro ao sincronizar cards em ${guild.id}:`, err.message);
         return null;
       });
       if (res) {
-        console.log(`[scheduler] Cards sincronizados em ${guild.name}: ${res.enviados} novos, ${res.editados} editados, ${res.removidos} removidos.`);
+        const hh = String(Math.floor(alvo / 60)).padStart(2, '0');
+        const mm = String(alvo % 60).padStart(2, '0');
+        console.log(`[scheduler] Envio das ${hh}:${mm} — cards sincronizados em ${guild.name}: ${res.enviados} novos, ${res.editados} editados, ${res.removidos} removidos.`);
       }
     }
   });
