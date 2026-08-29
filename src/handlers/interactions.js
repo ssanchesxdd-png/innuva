@@ -643,7 +643,7 @@ async function mostrarMenuWelcome(interaction, store) {
     description:
       'Quando alguém entrar no servidor, o bot envia a mensagem no canal escolhido.\n\n' +
       `**Canal atual:** ${store.welcome.channelId ? `<#${store.welcome.channelId}>` : '⚠️ não configurado (recurso desativado)'}\n` +
-      `**Mensagem atual:** ${store.welcome.message ? `\n> ${store.welcome.message}` : '`👋 Bem-vindo(a) {user} ao **{server}**!` (padrão)`}\n\n` +
+      `**Mensagem atual:** ${store.welcome.message ? `\n> ${store.welcome.message}` : "'👋 Bem-vindo(a) {user} ao **{server}**!' (padrão)"}\n\n` +
       '**Placeholders:** `{user}` menção ao novo membro · `{server}` nome do servidor · `{tag}` usuário · `{membros}` total de membros.\n' +
       'Para desativar, envie o seletor sem nenhum canal selecionado.',
     rows: [
