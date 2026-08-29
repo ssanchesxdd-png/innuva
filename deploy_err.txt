@@ -1,0 +1,86 @@
+==> Verifying app config
+--> Verified app config
+==> Building image
+Waiting for depot builder...
+
+==> Building image with Depot
+--> ]8;;build: ]8;;
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile:
+#1 transferring dockerfile: 725B 0.6s done
+#1 DONE 0.6s
+
+#2 [internal] load metadata for docker.io/library/node:20-alpine
+#2 DONE 0.3s
+
+#3 [internal] load .dockerignore
+#3 transferring context:
+#3 transferring context: 142B 0.5s done
+#3 DONE 0.5s
+
+#4 [stage-1 1/5] FROM docker.io/library/node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293
+#4 resolve docker.io/library/node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 done
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 9.90kB 0.8s done
+#5 DONE 0.8s
+
+#6 [build 3/4] COPY package.json package-lock.json ./
+#6 CACHED
+
+#7 [build 4/4] RUN npm ci --omit=dev
+#7 CACHED
+
+#8 [stage-1 2/5] WORKDIR /app
+#8 CACHED
+
+#9 [stage-1 3/5] COPY --from=build /app/node_modules ./node_modules
+#9 CACHED
+
+#10 [stage-1 4/5] COPY . .
+#10 DONE 0.0s
+
+#11 [stage-1 5/5] RUN mkdir -p /data
+#11 DONE 0.1s
+
+#12 exporting to image
+#12 exporting layers 0.0s done
+#12 exporting manifest sha256:6f05624485a10773b07dfc29e8b89c23de4cc4f50c541aa5ccaf806eea60ae07 done
+#12 exporting config sha256:cc584e58c4642ba6d8be92dabbe04abcc06fa964800428337e9ba18868c4f03b done
+#12 pushing layers for registry.fly.io/innuva:deployment-01M15H8RCQ2VYGJAJJNZ9Q5ANV@sha256:6f05624485a10773b07dfc29e8b89c23de4cc4f50c541aa5ccaf806eea60ae07
+#12 pushing layer sha256:cc584e58c4642ba6d8be92dabbe04abcc06fa964800428337e9ba18868c4f03b
+#12 pushing layer sha256:a97d1556caba65f5b595e540049572f6de96a148afdc184d52a49b0d43c0b861
+#12 pushing layer sha256:79162180734b88ff8cc67216853fcd9fe1fc55fc61873d5bfd6e8f93d0897bf4
+#12 pushing layer sha256:4b0509c947003be1323a5a38977845d73b4980e37144df3290035d51059ccb48
+#12 pushing layer sha256:c59f4feb5aa577638f9280b984a9bdd2d8a599eafeb85538ea635e3a54545cdb
+#12 pushing layer sha256:1c7f9b6c07a76147766c1efbea9c1fba8d3bc76d8cbece5c13abe8afc1ffc36f
+#12 pushing layer sha256:e8dec818d9cf2e26d2046ec6e7a0823e3e9d8e63eb78cc082efcff90c3022719
+#12 pushing layer sha256:5f31214a420be513a0d2607c26b5ebd5964d6cb4126cb07e99b6855cf3897703
+#12 pushing layer sha256:96f926e0b797929d9cd0ad2edcd2d3e058cf98c1b04965e094a7dbf0d174dac5
+#12 pushing layer sha256:1c7f9b6c07a76147766c1efbea9c1fba8d3bc76d8cbece5c13abe8afc1ffc36f 0.4s done
+#12 pushing layer sha256:79162180734b88ff8cc67216853fcd9fe1fc55fc61873d5bfd6e8f93d0897bf4 0.7s done
+#12 pushing layer sha256:4b0509c947003be1323a5a38977845d73b4980e37144df3290035d51059ccb48 0.9s done
+#12 pushing layer sha256:96f926e0b797929d9cd0ad2edcd2d3e058cf98c1b04965e094a7dbf0d174dac5 1.3s done
+#12 pushing layer sha256:5f31214a420be513a0d2607c26b5ebd5964d6cb4126cb07e99b6855cf3897703 1.5s done
+#12 pushing layer sha256:c59f4feb5aa577638f9280b984a9bdd2d8a599eafeb85538ea635e3a54545cdb 1.6s done
+#12 pushing layers for registry.fly.io/innuva:deployment-01M15H8RCQ2VYGJAJJNZ9Q5ANV@sha256:6f05624485a10773b07dfc29e8b89c23de4cc4f50c541aa5ccaf806eea60ae07 1.8s done
+#12 pushing layer sha256:cc584e58c4642ba6d8be92dabbe04abcc06fa964800428337e9ba18868c4f03b 1.7s done
+#12 pushing layer sha256:a97d1556caba65f5b595e540049572f6de96a148afdc184d52a49b0d43c0b861 1.7s done
+#12 pushing layer sha256:e8dec818d9cf2e26d2046ec6e7a0823e3e9d8e63eb78cc082efcff90c3022719 1.8s done
+#12 pushing manifest for registry.fly.io/innuva:deployment-01M15H8RCQ2VYGJAJJNZ9Q5ANV@sha256:6f05624485a10773b07dfc29e8b89c23de4cc4f50c541aa5ccaf806eea60ae07
+#12 pushing manifest for registry.fly.io/innuva:deployment-01M15H8RCQ2VYGJAJJNZ9Q5ANV@sha256:6f05624485a10773b07dfc29e8b89c23de4cc4f50c541aa5ccaf806eea60ae07 0.1s done
+#12 DONE 2.0s
+--> ]8;;Build Summary: ]8;;
+[38;5;252m--> Building image done[0m
+image: registry.fly.io/innuva:deployment-01M15H8RCQ2VYGJAJJNZ9Q5ANV
+image size: 46 MB
+Checking DNS configuration for innuva.fly.dev
+✓ DNS configuration verified
+fly : Connecting to fdaa:bc:952e:a7b:fc:10bb:be70:2...
+No C:\Users\sanches\Projects\innuva\scripts\deploy-fly.ps1:58 caractere:5
++     fly ssh console --app $app -C "rm -f /data/$guildFile" 2>$null |  ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Connecting to f...:10bb:be70:2...:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 

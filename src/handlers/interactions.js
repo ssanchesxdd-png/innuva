@@ -118,7 +118,6 @@ async function mostrarMenuRoot(interaction) {
       { label: 'Configurações de Ticket', value: 'ticket', emoji: '🎫', description: 'Canal do painel de suporte/ticket' },
       { label: 'Configurações de Logs', value: 'logs', emoji: '📋', description: 'Canais de log privado e público' },
       { label: 'Cargos Automáticos', value: 'cargos', emoji: '🏷️', description: 'Cargo de Comprador (1ª compra) e Novo Membro (entrada no servidor)' },
-      { label: 'Boas-vindas', value: 'welcome', emoji: '👋', description: 'Mensagem automática quando um novo membro entrar' },
       { label: 'Personalização', value: 'personalizacao', emoji: '🎨', description: 'Nome do bot, nome da loja, cor e imagens' }
     ]);
 
@@ -236,7 +235,6 @@ async function handleSelectMenu(interaction) {
     if (escolha === 'ticket') return mostrarMenuTicket(interaction);
     if (escolha === 'logs') return mostrarMenuLogs(interaction);
     if (escolha === 'cargos') return mostrarMenuCargos(interaction, store);
-    if (escolha === 'welcome') return mostrarMenuWelcome(interaction, store);
     if (escolha === 'personalizacao') return mostrarMenuPersonalizacao(interaction, store);
   }
 
@@ -625,42 +623,6 @@ async function mostrarMenuCargos(interaction, store) {
   await updateV2(interaction, container);
 }
 
-// ---------- PAINEL BOAS-VINDAS ----------
-
-// Painel /config > Boas-vindas: canal + mensagem enviada a novos membros
-async function mostrarMenuWelcome(interaction, store) {
-  if (!store.welcome) store.welcome = { channelId: null, message: null };
-
-  const canalMenu = new ChannelSelectMenuBuilder()
-    .setCustomId('config:canal:welcome')
-    .setPlaceholder('Canal da mensagem de boas-vindas (vazio = desativar)')
-    .setMinValues(0)
-    .setMaxValues(1)
-    .setChannelTypes(ChannelType.GuildText);
-
-  const container = v2Container(store, {
-    title: '👋 Boas-vindas',
-    description:
-      'Quando alguém entrar no servidor, o bot envia a mensagem no canal escolhido.\n\n' +
-      `**Canal atual:** ${store.welcome.channelId ? `<#${store.welcome.channelId}>` : '⚠️ não configurado (recurso desativado)'}\n` +
-      `**Mensagem atual:** ${store.welcome.message ? `\n> ${store.welcome.message}` : "'👋 Bem-vindo(a) {user} ao **{server}**!' (padrão)"}\n\n` +
-      '**Placeholders:** `{user}` menção ao novo membro · `{server}` nome do servidor · `{tag}` usuário · `{membros}` total de membros.\n' +
-      'Para desativar, envie o seletor sem nenhum canal selecionado.',
-    rows: [
-      new ActionRowBuilder().addComponents(canalMenu),
-      new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId('config:editar_boasvindas')
-          .setLabel('✏️ Editar mensagem')
-          .setStyle(ButtonStyle.Secondary)
-      )
-    ],
-    sections: [secaoVoltar('root')]
-  });
-
-  await updateV2(interaction, container);
-}
-
 async function handleRoleSelectMenu(interaction) {
   const id = interaction.customId;
   const store = loadStore(interaction.guildId);
@@ -730,13 +692,6 @@ async function handleChannelSelectMenu(interaction) {
       sections: [secaoVoltar('root')]
     });
     return updateV2(interaction, container);
-  }
-
-  if (id === 'config:canal:welcome') {
-    if (!store.welcome) store.welcome = { channelId: null, message: null };
-    store.welcome.channelId = interaction.values[0] || null;
-    saveStore(interaction.guildId, store);
-    return mostrarMenuWelcome(interaction, store);
   }
 
   if (id === 'config:canal:envio_vendas') {
@@ -904,24 +859,6 @@ async function handleButton(interaction) {
   if (id === 'config:abrir_cores') return mostrarGradeCores(interaction, store);
   if (id === 'config:abrir_imagens') return mostrarMenuImagens(interaction, store);
   if (id === 'config:abrir_infos') return abrirModalPersonalizacao(interaction, store);
-
-  // ---- Config: boas-vindas ----
-  if (id === 'config:editar_boasvindas') {
-    const modal = new ModalBuilder()
-      .setCustomId('modal:boasvindas')
-      .setTitle('Mensagem de Boas-vindas');
-    modal.addComponents(
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
-          .setCustomId('mensagem')
-          .setLabel('Mensagem ({user}, {server}, {tag}, {membros})')
-          .setStyle(TextInputStyle.Paragraph)
-          .setValue(store.welcome?.message || '👋 Bem-vindo(a) {user} ao **{server}**!')
-          .setRequired(true)
-      )
-    );
-    return interaction.showModal(modal);
-  }
 
   // ---- Config: publicar/atualizar os cards de produto nos canais ----
   if (id === 'config:publicar') {
@@ -1295,13 +1232,6 @@ async function handleModalSubmit(interaction) {
     store.ticket.faq.push({ id: generateId('faq_'), pergunta, resposta });
     saveStore(interaction.guildId, store);
     return mostrarMenuTicket(interaction);
-  }
-
-  if (id === 'modal:boasvindas') {
-    if (!store.welcome) store.welcome = { channelId: null, message: null };
-    store.welcome.message = interaction.fields.getTextInputValue('mensagem').trim();
-    saveStore(interaction.guildId, store);
-    return mostrarMenuWelcome(interaction, store);
   }
 
   if (id === 'modal:personalizacao') {

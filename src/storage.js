@@ -46,10 +46,6 @@ function defaultStore() {
       privateChannelId: null,
       publicChannelId: null
     },
-    welcome: {
-      channelId: null, // canal onde a mensagem de boas-vindas é enviada (null = desativado)
-      message: null    // mensagem customizada; placeholders: {user} {server} {tag} {membros}
-    },
     coupons: [],    // { id, code, type: 'percent'|'fixed', value, uses, maxUses, expiresAt }
     pendings: [],   // vendas aguardando pagamento: { id, threadId, guildId, userId, productId, quantity, initialValue, discount, finalValue, couponCode, accountUsername, referenceImage, expiresAt }
     pixKey: null,   // chave Pix exibida nas vendas pendentes
@@ -111,7 +107,6 @@ function migrarCamposFaltantes(store) {
   if (!Array.isArray(store.coupons)) store.coupons = [];
   if (!Array.isArray(store.pendings)) store.pendings = [];
   if (store.pixKey === undefined) store.pixKey = null;
-  if (!store.welcome) store.welcome = d.welcome;
   if (!store.avaliacoes) store.avaliacoes = {};
   if (!store.roles) store.roles = { primeiraCompra: null, novoMembro: null };
   // Migracao da versao antiga (novoCliente/comprador por ticket/compra)
