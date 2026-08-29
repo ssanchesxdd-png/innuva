@@ -24,27 +24,50 @@ function galeria(url) {
 }
 
 // Recibo publico de venda (log #auto): sem foto — foto so no botao "Referencia"
+// Estetica inspirada num recibo limpo: titulo com destaque, comprador mencionado,
+// carrinho e valor em inline code e footer discreto com loja + data.
 function publicSaleContainer(store, compra) {
+  const valor = compra.finalValue.toFixed(2).replace('.', ',');
+  const data = new Date(compra.date);
+  const dataFormatada =
+    `${data.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })} ` +
+    `${data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+
   const container = new ContainerBuilder()
     .setAccentColor(accent(store))
     .addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(`**${compra.productName}**`)
+      new TextDisplayBuilder().setContent(`## 🔒 Entrega Realizada!`)
     )
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
-        `<@${compra.buyerId}>\n` +
-        `${new Date(compra.date).toLocaleString('pt-BR')}`
+        `O usuário <@${compra.buyerId}> recebeu seu pedido.`
       )
     )
-    .addSeparatorComponents(new SeparatorBuilder())
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
-        `🪪 **Nick:** ${compra.accountUsername || 'Não informado'}\n` +
-        `🎮 **Produto:** ${compra.productName} x${compra.quantity}\n` +
-        `💰 **Valor:** R$ ${compra.finalValue.toFixed(2)}`
+        `**Carrinho**\n\`${compra.quantity}x ${compra.productName}\``
       )
     )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `**Valor pago**\n\`R$ ${valor}\``
+      )
+    );
+
+  // Nick da conta entregue, quando a staff preencheu na entrega
+  if (compra.accountUsername) {
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `**Conta entregue**\n\`${compra.accountUsername}\``
+      )
+    );
+  }
+
+  container
     .addSeparatorComponents(new SeparatorBuilder())
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(`-# ${store.storeName} • ${dataFormatada}`)
+    )
     .addActionRowComponents(
       new ActionRowBuilder().addComponents(
         new ButtonBuilder()
