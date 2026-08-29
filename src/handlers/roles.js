@@ -54,11 +54,38 @@ async function aoConcluirPrimeiraCompra(guild, store, userId) {
   }
 }
 
-// Novo membro entrou no servidor (cargo de boas-vindas)
+// Mensagem de boas-vindas no canal configurado (/config > Boas-vindas).
+// Placeholders: {user} mencao, {server} nome do servidor, {tag} usuario, {membros} total.
+async function enviarBoasVindas(guild, store, member) {
+  const cfg = store.welcome;
+  if (!cfg?.channelId) return; // desativado por padrao (sem canal configurado)
+  try {
+    const canal = await guild.channels.fetch(cfg.channelId).catch(() => null);
+    if (!canal) return;
+    const texto = (cfg.message || '👋 Bem-vindo(a) {user} ao **{server}**!')
+      .replaceAll('{user}', `<@${member.id}>`)
+      .replaceAll('{server}', guild.name)
+      .replaceAll('{tag}', member.user.tag)
+      .replaceAll('{membros}', String(guild.memberCount));
+    const container = new ContainerBuilder()
+      .setAccentColor(coresBoasVindas(store))
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent(texto));
+    await canal.send({ components: [container], flags: [MessageFlags.IsComponentsV2] });
+  } catch (err) {
+    console.error('[boas-vindas] Erro ao enviar mensagem de boas-vindas:', err.message);
+  }
+}
+
+// Novo membro entrou no servidor (cargo de boas-vindas + mensagem)
 async function aoEntrarNovoMembro(guild, member) {
+  if (member.user.bot) return;
   const store = loadStore(guild.id);
+
+  // Mensagem de boas-vindas (nao bloqueia/nao depende do cargo)
+  await enviarBoasVindas(guild, store, member);
+
   const roleId = store.roles?.novoMembro;
-  if (!roleId || member.user.bot) return;
+  if (!roleId) return;
   try {
     if (member.roles.cache.has(roleId)) return;
     await member.roles.add(roleId, 'Concessao automatica: cargo Novo Membro');
