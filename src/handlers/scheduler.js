@@ -7,7 +7,9 @@ const cron = require('node-cron');
 const { loadStore, saveStore, getDataDir } = require('../storage');
 const { publicarCards } = require('./publicar');
 const { fazerBackup } = require('./backups');
-const { AttachmentBuilder } = require('discord.js');
+const { ticketPanelSelectRow } = require('./tickets');
+const { ticketPanelContainer } = require('../utils/embeds');
+const { AttachmentBuilder, MessageFlags } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 
@@ -100,10 +102,42 @@ function iniciarAgendador(client) {
         console.error(`Erro ao reenviar cards em ${guild.id}:`, err.message);
         return null;
       });
-      if (res) {
+
+      // Reenvia tambem o painel de suporte/ticket (apaga o antigo e publica novo).
+      // Recarrega a store DEPOIS do publicarCards pra nao sobrescrever as
+      // alteracoes de cardMessages que ele acabou de gravar.
+      let painelOk = false;
+      try {
+        const storeAtual = loadStore(guild.id);
+        if (storeAtual.ticket?.panelChannelId) {
+          const canalPainel = await guild.channels.fetch(storeAtual.ticket.panelChannelId).catch(() => null);
+          if (canalPainel) {
+            if (storeAtual.panelMessageId) {
+              const antiga = await canalPainel.messages.fetch(storeAtual.panelMessageId).catch(() => null);
+              if (antiga) await antiga.delete().catch(() => {});
+            }
+            const nova = await canalPainel.send({
+              components: [ticketPanelContainer(storeAtual, ticketPanelSelectRow())],
+              flags: MessageFlags.IsComponentsV2
+            }).catch(err => { console.error('[scheduler] falha ao reenviar painel:', err.message); return null; });
+            if (nova) {
+              storeAtual.panelMessageId = nova.id;
+              saveStore(guild.id, storeAtual);
+              painelOk = true;
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[scheduler] erro ao reenviar painel de suporte:', err.message);
+      }
+
+      if (res || painelOk) {
         const hh = String(Math.floor(alvo / 60)).padStart(2, '0');
         const mm = String(alvo % 60).padStart(2, '0');
-        console.log(`[scheduler] Reenvio das ${hh}:${mm} — cards republicados em ${guild.name}: ${res.enviados} reenviados, ${res.removidos} removidos.`);
+        const detalhe = [];
+        if (res) detalhe.push(`${res.enviados} cards republicados`);
+        if (painelOk) detalhe.push('painel de suporte republicado');
+        console.log(`[scheduler] Reenvio das ${hh}:${mm} em ${guild.name}: ${detalhe.join(', ')}.`);
       }
     }
   });
