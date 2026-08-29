@@ -10,8 +10,11 @@ const { loadStore, saveStore } = require('../storage');
 const { V2_FLAGS, montarContainerProduto } = require('../utils/v2');
 
 // Publica/atualiza todos os cards nos canais de envio.
+// Opcoes:
+//   repostar: true  -> apaga os cards antigos e publica novos (usado no reenvio
+//                      programado, pra mensagem aparecer no topo do canal)
 // Retorna { enviados, editados, removidos } ou null se nao ha canais configurados.
-async function publicarCards(guild) {
+async function publicarCards(guild, { repostar = false } = {}) {
   const store = loadStore(guild.id);
   const canais = store.sales.sendChannelIds || [];
   const produtos = store.sales.products;
@@ -41,6 +44,18 @@ async function publicarCards(guild) {
     for (const produto of produtos) {
       const reg = registros.find(r => r.productId === produto.id && r.channelId === canalId);
       const container = montar(produto);
+
+      if (reg && repostar) {
+        // Reenvio programado: apaga o card antigo e publica um novo no topo
+        const antiga = await canal.messages.fetch(reg.messageId).catch(() => null);
+        if (antiga) await antiga.delete().catch(() => {});
+        const nova = await canal.send({ components: [container], flags: V2_FLAGS }).catch(err => { console.log('[publicar] falha ao reenviar: ' + (err.code || '') + ' ' + (err.message || '')); return null; });
+        if (nova) {
+          reg.messageId = nova.id;
+          enviados++;
+        }
+        continue;
+      }
 
       if (reg) {
         const msg = await canal.messages.fetch(reg.messageId).catch(() => null);

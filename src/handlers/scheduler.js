@@ -96,14 +96,14 @@ function iniciarAgendador(client) {
       store.sales.lastAutoSend = { dia, minuto: alvo };
       saveStore(guild.id, store);
 
-      const res = await publicarCards(guild).catch(err => {
-        console.error(`Erro ao sincronizar cards em ${guild.id}:`, err.message);
+      const res = await publicarCards(guild, { repostar: true }).catch(err => {
+        console.error(`Erro ao reenviar cards em ${guild.id}:`, err.message);
         return null;
       });
       if (res) {
         const hh = String(Math.floor(alvo / 60)).padStart(2, '0');
         const mm = String(alvo % 60).padStart(2, '0');
-        console.log(`[scheduler] Envio das ${hh}:${mm} — cards sincronizados em ${guild.name}: ${res.enviados} novos, ${res.editados} editados, ${res.removidos} removidos.`);
+        console.log(`[scheduler] Reenvio das ${hh}:${mm} — cards republicados em ${guild.name}: ${res.enviados} reenviados, ${res.removidos} removidos.`);
       }
     }
   });
