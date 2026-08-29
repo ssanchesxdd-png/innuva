@@ -128,13 +128,20 @@ async function pagamentoAprovado(interaction, pendingId) {
   const idx = store.pendings.findIndex(p => p.id === pendingId);
 
   if (idx === -1) {
-    return interaction.update({
+    // A interacao pode ja ter sido deferida (ex: clique duplo no botao) —
+    // nesse caso usa editReply em vez de update para nao estourar
+    // InteractionAlreadyReplied.
+    const aviso = {
       components: [new ContainerBuilder()
         .setAccentColor(0xED4245)
         .addTextDisplayComponents(new TextDisplayBuilder().setContent('❌ Pendência não encontrada (pode já ter sido resolvida).'))
       ],
       flags: [MessageFlags.IsComponentsV2]
-    });
+    };
+    if (interaction.deferred || interaction.replied) {
+      return interaction.editReply(aviso).catch(() => {});
+    }
+    return interaction.update(aviso);
   }
 
   const pending = store.pendings[idx];
@@ -297,13 +304,17 @@ async function cancelarPendente(interaction, pendingId) {
   const idx = store.pendings.findIndex(p => p.id === pendingId);
 
   if (idx === -1) {
-    return interaction.update({
+    const aviso = {
       components: [new ContainerBuilder()
         .setAccentColor(0xED4245)
         .addTextDisplayComponents(new TextDisplayBuilder().setContent('❌ Pendência não encontrada.'))
       ],
       flags: [MessageFlags.IsComponentsV2]
-    });
+    };
+    if (interaction.deferred || interaction.replied) {
+      return interaction.editReply(aviso).catch(() => {});
+    }
+    return interaction.update(aviso);
   }
   store.pendings.splice(idx, 1);
   saveStore(interaction.guildId, store);

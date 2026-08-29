@@ -650,6 +650,11 @@ async function handleTicketButton(interaction) {
     if (!ehStaff(interaction)) {
       return interaction.reply({ content: '🔒 Apenas a staff pode confirmar a entrega.', flags: MessageFlags.Ephemeral });
     }
+    // Guarda anti clique-duplo: se a venda ja foi confirmada nesse ticket,
+    // apenas atualiza o botao sem processar de novo.
+    if (registro.stage === 'entregue' || !registro.pendingId) {
+      return interaction.deferUpdate().catch(() => {});
+    }
     await interaction.deferUpdate();
     const pendingId = registro.pendingId;
     registro.stage = 'entregue';
