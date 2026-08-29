@@ -68,7 +68,7 @@ async function enviarBoasVindas(guild, store, member) {
       .replaceAll('{tag}', member.user.tag)
       .replaceAll('{membros}', String(guild.memberCount));
     const container = new ContainerBuilder()
-      .setAccentColor(coresBoasVindas(store))
+      .setAccentColor(parseInt((store.color || '#5865F2').replace('#', ''), 16))
       .addTextDisplayComponents(new TextDisplayBuilder().setContent(texto));
     await canal.send({ components: [container], flags: [MessageFlags.IsComponentsV2] });
   } catch (err) {
