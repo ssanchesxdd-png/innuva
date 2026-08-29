@@ -3,3 +3,5 @@ node_modules/
 data/*.json
 .DS_Store
 Thumbs.db
+deploy_log.txt
+deploy_err.txt
