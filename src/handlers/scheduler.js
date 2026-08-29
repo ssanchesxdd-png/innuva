@@ -4,7 +4,7 @@
 // (edita os cards existentes em vez de duplicar).
 
 const cron = require('node-cron');
-const { loadStore, getDataDir } = require('../storage');
+const { loadStore, saveStore, getDataDir } = require('../storage');
 const { publicarCards } = require('./publicar');
 const { fazerBackup } = require('./backups');
 const { AttachmentBuilder } = require('discord.js');
